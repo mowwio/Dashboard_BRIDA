@@ -23,7 +23,6 @@ const getMaturityBadge = (score: number) => {
 };
 
 export function DetailViewModal({ data, darkMode, onClose }: DetailViewModalProps) {
-  // ✅ Ganti latitude/longitude jadi lat/lon
   const googleMapsUrl = `https://www.google.com/maps?q=${data.lat},${data.lon}`;
   const badge = getMaturityBadge(data.kematangan);
   
@@ -223,7 +222,7 @@ export function DetailViewModal({ data, darkMode, onClose }: DetailViewModalProp
             </div>
           )}
 
-          {/* Lokasi - ✅ Ganti latitude/longitude jadi lat/lon */}
+          {/* Lokasi */}
           <div className={`rounded-xl p-6 shadow-lg ${darkMode ? 'bg-gray-800/50 border border-gray-700' : 'bg-white border border-gray-200'}`}>
             <h4 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-gray-800'}`}>
               <MapPin size={20} className="text-orange-500" />

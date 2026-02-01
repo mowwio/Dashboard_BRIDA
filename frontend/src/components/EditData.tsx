@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Save, Search, AlertCircle, CheckCircle } from 'lucide-react';
-import { InovasiDaerah } from '../lib/supabase';
+import { supabase, InovasiDaerah } from '../lib/supabase';
 
 interface EditDataProps {
   darkMode: boolean;
@@ -9,116 +9,176 @@ interface EditDataProps {
   onSubmit: (data: Partial<InovasiDaerah>) => void;
 }
 
-// Daftar Admin OPD
-const adminOPDList = [
-  'Badan Kepegawaian Daerah Provinsi Jawa Timur',
-  'Badan Kesatuan Bangsa dan Politik Provinsi Jawa Timur',
-  'Badan Pendapatan Daerah Provinsi Jawa Timur',
-  'Dinas Energi dan Sumber Daya Mineral Provinsi Jawa Timur',
-  'Dinas Kebudayaan dan Pariwisata Provinsi Jawa Timur',
-  'Dinas Kelautan dan Perikanan Provinsi Jawa Timur',
-  'Dinas Kepemudaan dan Olahraga Provinsi Jawa Timur',
-  'Dinas Kesehatan Provinsi Jawa Timur',
-  'Dinas Komunikasi dan Informatika Provinsi Jawa Timur',
-  'Dinas Koperasi, Usaha Kecil dan Menengah Provinsi Jawa Timur',
-  'Dinas Lingkungan Hidup Provinsi Jawa Timur',
-  'Dinas Pekerjaan Umum Bina Marga Provinsi Jawa Timur',
-  'Dinas Pemberdayaan Masyarakat dan Desa Provinsi Jawa Timur',
-  'Dinas Penanaman Modal dan Pelayanan Terpadu Satu Pintu Provinsi Jawa Timur',
-  'Dinas Perhubungan Provinsi Jawa Timur',
-  'Dinas Perindustrian dan Perdagangan Provinsi Jawa Timur',
-  'Dinas Perpustakaan dan Kearsipan Provinsi Jawa Timur',
-  'Dinas Pertanian dan Ketahanan Pangan Provinsi Jawa Timur',
-  'Dinas Sosial Provinsi Jawa Timur',
-  'Dinas Tenaga Kerja dan Transmigrasi Provinsi Jawa Timur',
-];
-
-// Daftar Asta Cipta
-const astaCiptaList = [
-  'Pangan',
-  'Energi',
-  'Air',
-  'Kesehatan',
-  'Lingkungan',
-  'Keamanan',
-  'Teknologi',
-  'SDM',
-];
-
-// Daftar Urusan Utama
-const urusanUtamaList = [
-  'Administrasi Kependudukan Dan Pencatatan Sipil',
-  'Energi Dan Sumber Daya Mineral',
+// List Urusan Lain yang Beririsan (bisa pilih lebih dari satu)
+const urusanLainList = [
+  'Administrasi Kependudukan dan Pencatatan Sipil',
+  'Energi dan Sumber Daya Mineral',
   'Kearsipan',
   'Kebudayaan',
-  'Kelautan Dan Perikanan',
-  'Kepegawaian',
-  'Kepemudaan Dan Olah Raga',
+  'Kehutanan',
+  'Kelautan dan Perikanan',
+  'Kepemudaan dan Olah Raga',
   'Kesehatan',
-  'Ketenteraman, Ketertiban Umum, Dan Pelindungan Masyarakat',
-  'Keuangan',
-  'Komunikasi Dan Informatika',
-  'Koperasi, Usaha Kecil, Dan Menengah',
+  'Ketenteraman, Ketertiban Umum, dan Pelindungan Masyarakat',
+  'Komunikasi dan Informatika',
+  'Koperasi, Usaha Kecil, dan Menengah',
   'Lingkungan Hidup',
   'Pangan',
   'Pariwisata',
-  'Pekerjaan Umum Dan Penataan Ruang',
-  'Pemberdayaan Masyarakat Dan Desa',
-  'Pemberdayaan Perempuan Dan Pelindungan Anak',
+  'Pekerjaan Umum dan Penataan Ruang',
+  'Pemberdayaan Masyarakat dan Desa',
+  'Pemberdayaan Perempuan dan Pelindungan Anak',
   'Penanaman Modal',
-  'Pendidikan',
-  'Penelitian Dan Pengembangan',
+  'Pengendalian Penduduk dan Keluarga Berencana',
   'Perdagangan',
-  'Perencanaan',
   'Perhubungan',
+  'Perindustrian',
   'Perpustakaan',
+  'Pertanahan',
   'Pertanian',
-  'Perumahan Rakyat Dan Kawasan Permukiman',
-  'Pelayanan Terpadu Satu Pintu',
+  'Perumahan Rakyat dan Kawasan Permukiman',
   'Sosial',
+  'Statistik',
   'Tenaga Kerja',
+  'Transmigrasi',
+  'Fungsi Penunjang lainnya sesuai dengan ketentuan peraturan perundang-undangan',
+  'Kepegawaian',
+  'Keuangan',
+  'Pendidikan dan Pelatihan (Diklat)',
+  'Penelitian dan Pengembangan (Litbang)',
+  'Perencanaan',
+  'Tidak ada',
 ];
 
 export function EditData({ darkMode, data, onClose, onSubmit }: EditDataProps) {
-  // ✅ Initialize form with existing data
+  // State form dengan data existing
   const [formData, setFormData] = useState<InovasiDaerah>(data);
 
-  // UI States
-  const [searchOPD, setSearchOPD] = useState('');
+  // State untuk data unik dari database
+  const [uniqueValues, setUniqueValues] = useState({
+    inisiator: [] as string[],
+    bentuk_inovasi: [] as string[],
+    jenis: [] as string[],
+    asta_cipta: [] as string[],
+    urusan_utama: [] as string[],
+    tahapan_inovasi: [] as string[],
+  });
+
+  // State untuk urusan lain yang dipilih (parse dari data existing)
+  const [selectedUrusanLain, setSelectedUrusanLain] = useState<string[]>(
+    data.urusan_lain_yang_beririsan ? data.urusan_lain_yang_beririsan.split(', ').filter(Boolean) : []
+  );
+
+  // State untuk dropdown
+  const [searchInisiator, setSearchInisiator] = useState('');
+  const [searchBentuk, setSearchBentuk] = useState('');
+  const [searchJenis, setSearchJenis] = useState('');
   const [searchAsta, setSearchAsta] = useState('');
   const [searchUrusan, setSearchUrusan] = useState('');
   const [searchUrusanLain, setSearchUrusanLain] = useState('');
-  const [showOPDDropdown, setShowOPDDropdown] = useState(false);
+  const [searchTahapan, setSearchTahapan] = useState('');
+  
+  const [showInisiatorDropdown, setShowInisiatorDropdown] = useState(false);
+  const [showBentukDropdown, setShowBentukDropdown] = useState(false);
+  const [showJenisDropdown, setShowJenisDropdown] = useState(false);
   const [showAstaDropdown, setShowAstaDropdown] = useState(false);
   const [showUrusanDropdown, setShowUrusanDropdown] = useState(false);
   const [showUrusanLainDropdown, setShowUrusanLainDropdown] = useState(false);
+  const [showTahapanDropdown, setShowTahapanDropdown] = useState(false);
 
-  // Loading & Error States
+  // State untuk loading dan notifikasi
   const [loading, setLoading] = useState(false);
+  const [loadingOptions, setLoadingOptions] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // Filter functions
-  const filteredOPD = adminOPDList.filter(opd => 
-    opd.toLowerCase().includes(searchOPD.toLowerCase())
+  // Fetch nilai unik dari database
+  useEffect(() => {
+    const fetchUniqueValues = async () => {
+      try {
+        setLoadingOptions(true);
+        
+        const { data: allData, error } = await supabase
+          .from('inovasi_daerah')
+          .select('inisiator, bentuk_inovasi, jenis, asta_cipta, urusan_utama, tahapan_inovasi');
+
+        if (error) throw error;
+
+        if (allData) {
+          // Extract unique values untuk setiap field
+          const unique = {
+            inisiator: [...new Set(allData.map(item => item.inisiator).filter(Boolean))].sort(),
+            bentuk_inovasi: [...new Set(allData.map(item => item.bentuk_inovasi).filter(Boolean))].sort(),
+            jenis: [...new Set(allData.map(item => item.jenis).filter(Boolean))].sort(),
+            asta_cipta: [...new Set(allData.map(item => item.asta_cipta).filter(Boolean))].sort(),
+            urusan_utama: [...new Set(allData.map(item => item.urusan_utama).filter(Boolean))].sort(),
+            tahapan_inovasi: [...new Set(allData.map(item => item.tahapan_inovasi).filter(Boolean))].sort(),
+          };
+
+          setUniqueValues(unique);
+        }
+      } catch (err) {
+        console.error('Error fetching unique values:', err);
+      } finally {
+        setLoadingOptions(false);
+      }
+    };
+
+    fetchUniqueValues();
+  }, []);
+
+  // Filter data dropdown
+  const filteredInisiator = uniqueValues.inisiator.filter(val => 
+    val.toLowerCase().includes(searchInisiator.toLowerCase())
   );
 
-  const filteredAsta = astaCiptaList.filter(asta => 
-    asta.toLowerCase().includes(searchAsta.toLowerCase())
+  const filteredBentuk = uniqueValues.bentuk_inovasi.filter(val => 
+    val.toLowerCase().includes(searchBentuk.toLowerCase())
   );
 
-  const filteredUrusan = urusanUtamaList.filter(urusan => 
-    urusan.toLowerCase().includes(searchUrusan.toLowerCase())
+  const filteredJenis = uniqueValues.jenis.filter(val => 
+    val.toLowerCase().includes(searchJenis.toLowerCase())
   );
 
-  const filteredUrusanLain = urusanUtamaList.filter(urusan => 
-    urusan.toLowerCase().includes(searchUrusanLain.toLowerCase())
+  const filteredAsta = uniqueValues.asta_cipta.filter(val => 
+    val.toLowerCase().includes(searchAsta.toLowerCase())
   );
 
-  // ✅ HANDLE SUBMIT - Call onSubmit from DataManagement
+  const filteredUrusan = uniqueValues.urusan_utama.filter(val => 
+    val.toLowerCase().includes(searchUrusan.toLowerCase())
+  );
+
+  // Filter urusan lain dari list manual
+  const filteredUrusanLain = urusanLainList.filter(val => 
+    val.toLowerCase().includes(searchUrusanLain.toLowerCase())
+  );
+
+  const filteredTahapan = uniqueValues.tahapan_inovasi.filter(val => 
+    val.toLowerCase().includes(searchTahapan.toLowerCase())
+  );
+
+  // Toggle urusan lain (multi-select)
+  const toggleUrusanLain = (urusan: string) => {
+    setSelectedUrusanLain(prev => {
+      if (prev.includes(urusan)) {
+        return prev.filter(item => item !== urusan);
+      } else {
+        return [...prev, urusan];
+      }
+    });
+  };
+
+  // Submit form ke parent component
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData); // DataManagement will handle the actual Supabase update
+    
+    // Gabungkan urusan lain jadi string
+    const dataToSubmit = {
+      ...formData,
+      urusan_lain_yang_beririsan: selectedUrusanLain.join(', '),
+    };
+    
+    onSubmit(dataToSubmit);
   };
 
   return (
@@ -134,7 +194,7 @@ export function EditData({ darkMode, data, onClose, onSubmit }: EditDataProps) {
             Edit Data Inovasi
           </h3>
           <button 
-            onClick={onClose}
+            onClick={onClose} 
             disabled={loading}
             className={`${darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-800'} disabled:opacity-50`}
           >
@@ -142,7 +202,6 @@ export function EditData({ darkMode, data, onClose, onSubmit }: EditDataProps) {
           </button>
         </div>
 
-        {/* Success Alert */}
         {success && (
           <div className="m-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
             <CheckCircle className="text-green-600" size={20} />
@@ -150,12 +209,11 @@ export function EditData({ darkMode, data, onClose, onSubmit }: EditDataProps) {
           </div>
         )}
 
-        {/* Error Alert */}
         {error && (
           <div className="m-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
             <AlertCircle className="text-red-600 mt-0.5" size={20} />
             <div>
-              <p className="text-red-800 font-semibold">Gagal mengupdate data</p>
+              <p className="text-red-800 font-semibold">Gagal menyimpan data</p>
               <p className="text-red-600 text-sm mt-1">{error}</p>
             </div>
           </div>
@@ -179,6 +237,7 @@ export function EditData({ darkMode, data, onClose, onSubmit }: EditDataProps) {
                 className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
                   darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800'
                 }`}
+                placeholder="Masukkan judul inovasi"
               />
             </div>
 
@@ -199,72 +258,82 @@ export function EditData({ darkMode, data, onClose, onSubmit }: EditDataProps) {
               />
             </div>
 
-            {/* Admin OPD - Searchable Dropdown */}
-            <div className="relative">
+            {/* Admin OPD */}
+            <div>
               <label className={`block text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 Admin OPD *
+              </label>
+              <input
+                type="text"
+                required
+                disabled={loading}
+                value={formData.admin_opd}
+                onChange={(e) => setFormData({ ...formData, admin_opd: e.target.value })}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
+                  darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800'
+                }`}
+                placeholder="Masukkan nama Admin OPD"
+              />
+            </div>
+
+            {/* Inisiator - Searchable Dropdown */}
+            <div className="relative">
+              <label className={`block text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                Inisiator *
               </label>
               <div className="relative">
                 <input
                   type="text"
                   required
-                  disabled={loading}
-                  value={formData.admin_opd || searchOPD}
+                  disabled={loading || loadingOptions}
+                  value={searchInisiator || formData.inisiator}
                   onChange={(e) => {
-                    setSearchOPD(e.target.value);
-                    setFormData({ ...formData, admin_opd: e.target.value });
-                    setShowOPDDropdown(true);
+                    setSearchInisiator(e.target.value);
+                    setShowInisiatorDropdown(true);
                   }}
-                  onFocus={() => !loading && setShowOPDDropdown(true)}
+                  onFocus={() => {
+                    if (!loading && !loadingOptions) {
+                      setSearchInisiator('');
+                      setShowInisiatorDropdown(true);
+                    }
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => {
+                      setShowInisiatorDropdown(false);
+                      setSearchInisiator('');
+                    }, 200);
+                  }}
                   className={`w-full px-3 py-2 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
                     darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800'
                   }`}
+                  placeholder="Ketik atau pilih Inisiator"
                 />
                 <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
               </div>
-              {showOPDDropdown && filteredOPD.length > 0 && !loading && (
-                <div className={`absolute z-20 w-full mt-1 max-h-60 overflow-y-auto rounded-lg border shadow-lg ${
-                  darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'
-                }`}>
-                  {filteredOPD.map((opd, index) => (
+              {showInisiatorDropdown && filteredInisiator.length > 0 && !loading && !loadingOptions && (
+                <div 
+                  onMouseDown={(e) => e.preventDefault()}
+                  className={`absolute z-20 w-full mt-1 max-h-60 overflow-y-auto rounded-lg border shadow-lg ${
+                    darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'
+                  }`}
+                >
+                  {filteredInisiator.map((val, index) => (
                     <div
                       key={index}
                       onClick={() => {
-                        setFormData({ ...formData, admin_opd: opd });
-                        setSearchOPD('');
-                        setShowOPDDropdown(false);
+                        setFormData({ ...formData, inisiator: val });
+                        setSearchInisiator('');
+                        setShowInisiatorDropdown(false);
                       }}
                       className={`px-3 py-2 cursor-pointer transition-colors ${
                         darkMode ? 'hover:bg-gray-600 text-gray-200' : 'hover:bg-gray-100 text-gray-800'
                       }`}
                     >
-                      {opd}
+                      {val}
                     </div>
                   ))}
                 </div>
               )}
-            </div>
-
-            {/* Inisiator */}
-            <div>
-              <label className={`block text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                Inisiator *
-              </label>
-              <select
-                required
-                disabled={loading}
-                value={formData.inisiator}
-                onChange={(e) => setFormData({ ...formData, inisiator: e.target.value })}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
-                  darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800'
-                }`}
-              >
-                <option>Kepala Dinas</option>
-                <option>Kepala Bidang</option>
-                <option>Kepala Seksi</option>
-                <option>Staf</option>
-                <option>Lainnya</option>
-              </select>
             </div>
 
             {/* Nama Inisiator */}
@@ -281,46 +350,124 @@ export function EditData({ darkMode, data, onClose, onSubmit }: EditDataProps) {
                 className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
                   darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800'
                 }`}
+                placeholder="Nama lengkap inisiator"
               />
             </div>
 
-            {/* Bentuk Inovasi */}
-            <div>
+            {/* Bentuk Inovasi - Searchable Dropdown */}
+            <div className="relative">
               <label className={`block text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 Bentuk Inovasi *
               </label>
-              <select
-                required
-                disabled={loading}
-                value={formData.bentuk_inovasi}
-                onChange={(e) => setFormData({ ...formData, bentuk_inovasi: e.target.value })}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
-                  darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800'
-                }`}
-              >
-                <option>Inovasi Layanan</option>
-                <option>Inovasi Tata Kelola</option>
-                <option>Inovasi Lainnya</option>
-              </select>
+              <div className="relative">
+                <input
+                  type="text"
+                  required
+                  disabled={loading || loadingOptions}
+                  value={searchBentuk || formData.bentuk_inovasi}
+                  onChange={(e) => {
+                    setSearchBentuk(e.target.value);
+                    setShowBentukDropdown(true);
+                  }}
+                  onFocus={() => {
+                    if (!loading && !loadingOptions) {
+                      setSearchBentuk('');
+                      setShowBentukDropdown(true);
+                    }
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => {
+                      setShowBentukDropdown(false);
+                      setSearchBentuk('');
+                    }, 200);
+                  }}
+                  className={`w-full px-3 py-2 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
+                    darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800'
+                  }`}
+                  placeholder="Ketik atau pilih Bentuk Inovasi"
+                />
+                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+              </div>
+              {showBentukDropdown && filteredBentuk.length > 0 && !loading && !loadingOptions && (
+                <div onMouseDown={(e) => e.preventDefault()}
+                  className={`absolute z-20 w-full mt-1 max-h-60 overflow-y-auto rounded-lg border shadow-lg ${
+                  darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'
+                }`}>
+                  {filteredBentuk.map((val, index) => (
+                    <div
+                      key={index}
+                      onClick={() => {
+                        setFormData({ ...formData, bentuk_inovasi: val });
+                        setSearchBentuk('');
+                        setShowBentukDropdown(false);
+                      }}
+                      className={`px-3 py-2 cursor-pointer transition-colors ${
+                        darkMode ? 'hover:bg-gray-600 text-gray-200' : 'hover:bg-gray-100 text-gray-800'
+                      }`}
+                    >
+                      {val}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Jenis */}
-            <div>
+            {/* Jenis - Searchable Dropdown */}
+            <div className="relative">
               <label className={`block text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 Jenis *
               </label>
-              <select
-                required
-                disabled={loading}
-                value={formData.jenis}
-                onChange={(e) => setFormData({ ...formData, jenis: e.target.value })}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
-                  darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800'
-                }`}
-              >
-                <option>Digital</option>
-                <option>Non-Digital</option>
-              </select>
+              <div className="relative">
+                <input
+                  type="text"
+                  required
+                  disabled={loading || loadingOptions}
+                  value={searchJenis || formData.jenis}
+                  onChange={(e) => {
+                    setSearchJenis(e.target.value);
+                    setShowJenisDropdown(true);
+                  }}
+                  onFocus={() => {
+                    if (!loading && !loadingOptions) {
+                      setSearchJenis('');
+                      setShowJenisDropdown(true);
+                    }
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => {
+                      setShowJenisDropdown(false);
+                      setSearchJenis('');
+                    }, 200);
+                  }}
+                  className={`w-full px-3 py-2 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
+                    darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800'
+                  }`}
+                  placeholder="Ketik atau pilih Jenis"
+                />
+                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+              </div>
+              {showJenisDropdown && filteredJenis.length > 0 && !loading && !loadingOptions && (
+                <div onMouseDown={(e) => e.preventDefault()}
+                  className={`absolute z-20 w-full mt-1 max-h-60 overflow-y-auto rounded-lg border shadow-lg ${
+                  darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'
+                }`}>
+                  {filteredJenis.map((val, index) => (
+                    <div
+                      key={index}
+                      onClick={() => {
+                        setFormData({ ...formData, jenis: val });
+                        setSearchJenis('');
+                        setShowJenisDropdown(false);
+                      }}
+                      className={`px-3 py-2 cursor-pointer transition-colors ${
+                        darkMode ? 'hover:bg-gray-600 text-gray-200' : 'hover:bg-gray-100 text-gray-800'
+                      }`}
+                    >
+                      {val}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Asta Cipta - Searchable Dropdown */}
@@ -343,6 +490,7 @@ export function EditData({ darkMode, data, onClose, onSubmit }: EditDataProps) {
                   className={`w-full px-3 py-2 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
                     darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800'
                   }`}
+                  placeholder="Cari atau pilih Asta Cipta"
                 />
                 <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
               </div>
@@ -389,6 +537,7 @@ export function EditData({ darkMode, data, onClose, onSubmit }: EditDataProps) {
                   className={`w-full px-3 py-2 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
                     darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800'
                   }`}
+                  placeholder="Cari atau pilih Urusan Utama"
                 />
                 <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
               </div>
@@ -415,45 +564,78 @@ export function EditData({ darkMode, data, onClose, onSubmit }: EditDataProps) {
               )}
             </div>
 
-            {/* Urusan Lain yang Beririsan - Searchable Dropdown */}
-            <div className="relative">
+            {/* Urusan Lain yang Beririsan - Multi Select */}
+            <div className="relative md:col-span-2">
               <label className={`block text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                Urusan Lain Yang Beririsan
+                Urusan Lain Yang Beririsan (bisa pilih lebih dari 1)
               </label>
               <div className="relative">
                 <input
                   type="text"
                   disabled={loading}
-                  value={formData.urusan_lain_yang_beririsan || searchUrusanLain}
+                  value={searchUrusanLain}
                   onChange={(e) => {
                     setSearchUrusanLain(e.target.value);
-                    setFormData({ ...formData, urusan_lain_yang_beririsan: e.target.value });
                     setShowUrusanLainDropdown(true);
                   }}
                   onFocus={() => !loading && setShowUrusanLainDropdown(true)}
+                  onBlur={() => {
+                    setTimeout(() => setShowUrusanLainDropdown(false), 200);
+                  }}
                   className={`w-full px-3 py-2 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
                     darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800'
                   }`}
+                  placeholder="Cari urusan lain..."
                 />
                 <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
               </div>
-              {showUrusanLainDropdown && filteredUrusanLain.length > 0 && !loading && (
-                <div className={`absolute z-20 w-full mt-1 max-h-60 overflow-y-auto rounded-lg border shadow-lg ${
-                  darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'
-                }`}>
-                  {filteredUrusanLain.map((urusan, index) => (
-                    <div
+              
+              {/* Selected items */}
+              {selectedUrusanLain.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selectedUrusanLain.map((urusan, index) => (
+                    <span
                       key={index}
-                      onClick={() => {
-                        setFormData({ ...formData, urusan_lain_yang_beririsan: urusan });
-                        setSearchUrusanLain('');
-                        setShowUrusanLainDropdown(false);
-                      }}
-                      className={`px-3 py-2 cursor-pointer transition-colors ${
-                        darkMode ? 'hover:bg-gray-600 text-gray-200' : 'hover:bg-gray-100 text-gray-800'
+                      className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm ${
+                        darkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-100 text-blue-700'
                       }`}
                     >
                       {urusan}
+                      <button
+                        type="button"
+                        onClick={() => toggleUrusanLain(urusan)}
+                        className="hover:text-red-500"
+                      >
+                        <X size={14} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              
+              {/* Dropdown */}
+              {showUrusanLainDropdown && filteredUrusanLain.length > 0 && !loading && (
+                <div 
+                  onMouseDown={(e) => e.preventDefault()}
+                  className={`absolute z-20 w-full mt-1 max-h-60 overflow-y-auto rounded-lg border shadow-lg ${
+                    darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'
+                  }`}
+                >
+                  {filteredUrusanLain.map((val, index) => (
+                    <div
+                      key={index}
+                      onClick={() => {
+                        toggleUrusanLain(val);
+                        setSearchUrusanLain('');
+                      }}
+                      className={`px-3 py-2 cursor-pointer transition-colors flex items-center justify-between ${
+                        darkMode ? 'hover:bg-gray-600 text-gray-200' : 'hover:bg-gray-100 text-gray-800'
+                      } ${selectedUrusanLain.includes(val) ? (darkMode ? 'bg-blue-900/30' : 'bg-blue-50') : ''}`}
+                    >
+                      <span>{val}</span>
+                      {selectedUrusanLain.includes(val) && (
+                        <CheckCircle size={16} className="text-blue-500" />
+                      )}
                     </div>
                   ))}
                 </div>
@@ -479,24 +661,62 @@ export function EditData({ darkMode, data, onClose, onSubmit }: EditDataProps) {
               />
             </div>
 
-            {/* Tahapan Inovasi */}
-            <div>
+            {/* Tahapan Inovasi - Searchable Dropdown */}
+            <div className="relative">
               <label className={`block text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 Tahapan Inovasi *
               </label>
-              <select
-                required
-                disabled={loading}
-                value={formData.tahapan_inovasi}
-                onChange={(e) => setFormData({ ...formData, tahapan_inovasi: e.target.value })}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
-                  darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800'
-                }`}
-              >
-                <option>Inisiatif</option>
-                <option>Uji Coba</option>
-                <option>Penerapan</option>
-              </select>
+              <div className="relative">
+                <input
+                  type="text"
+                  required
+                  disabled={loading || loadingOptions}
+                  value={searchTahapan || formData.tahapan_inovasi}
+                  onChange={(e) => {
+                    setSearchTahapan(e.target.value);
+                    setShowTahapanDropdown(true);
+                  }}
+                  onFocus={() => {
+                    if (!loading && !loadingOptions) {
+                      setSearchTahapan('');
+                      setShowTahapanDropdown(true);
+                    }
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => {
+                      setShowTahapanDropdown(false);
+                      setSearchTahapan('');
+                    }, 200);
+                  }}
+                  className={`w-full px-3 py-2 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
+                    darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800'
+                  }`}
+                  placeholder="Ketik atau pilih Tahapan Inovasi"
+                />
+                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+              </div>
+              {showTahapanDropdown && filteredTahapan.length > 0 && !loading && !loadingOptions && (
+                <div onMouseDown={(e) => e.preventDefault()}
+                  className={`absolute z-20 w-full mt-1 max-h-60 overflow-y-auto rounded-lg border shadow-lg ${
+                  darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'
+                }`}>
+                  {filteredTahapan.map((val, index) => (
+                    <div
+                      key={index}
+                      onClick={() => {
+                        setFormData({ ...formData, tahapan_inovasi: val });
+                        setSearchTahapan('');
+                        setShowTahapanDropdown(false);
+                      }}
+                      className={`px-3 py-2 cursor-pointer transition-colors ${
+                        darkMode ? 'hover:bg-gray-600 text-gray-200' : 'hover:bg-gray-100 text-gray-800'
+                      }`}
+                    >
+                      {val}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Tanggal Input */}
@@ -581,10 +801,11 @@ export function EditData({ darkMode, data, onClose, onSubmit }: EditDataProps) {
                 className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
                   darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800 disabled:bg-gray-100'
                 }`}
+                placeholder="https://youtube.com/..."
               />
             </div>
 
-            {/* Latitude (lat) */}
+            {/* Latitude */}
             <div>
               <label className={`block text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 Latitude *
@@ -599,10 +820,11 @@ export function EditData({ darkMode, data, onClose, onSubmit }: EditDataProps) {
                 className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
                   darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800'
                 }`}
+                placeholder="-7.2575"
               />
             </div>
 
-            {/* Longitude (lon) */}
+            {/* Longitude */}
             <div>
               <label className={`block text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 Longitude *
@@ -617,6 +839,7 @@ export function EditData({ darkMode, data, onClose, onSubmit }: EditDataProps) {
                 className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
                   darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800'
                 }`}
+                placeholder="112.7521"
               />
             </div>
           </div>
@@ -639,7 +862,7 @@ export function EditData({ darkMode, data, onClose, onSubmit }: EditDataProps) {
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Save size={18} />
-              {loading ? 'Menyimpan...' : 'Update Data'}
+              {loading ? 'Mengupdate...' : 'Update Data'}
             </button>
           </div>
         </form>

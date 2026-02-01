@@ -2,7 +2,6 @@
 frontend/.env.local
 dataset/data_inovasi_clean.csv
 dataset/data_inovasi.xlsx
-fronend/src/lib/supabase.ts
-backend/cleaning.ipynb
-backend/data_cleaning.ipynb
-backend/explore_data.ipynb
+frontend/src/lib/supabase.ts
+backend/*.ipynb
+backend/__pycache__/

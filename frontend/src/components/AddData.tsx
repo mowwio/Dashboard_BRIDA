@@ -166,13 +166,25 @@ export function AddData({ darkMode, onClose, onSuccess }: AddDataProps) {
     val.toLowerCase().includes(searchUrusan.toLowerCase())
   );
 
-  const filteredUrusanLain = uniqueValues.urusan_lain.filter(val => 
+  // Filter urusan lain dari list manual
+  const filteredUrusanLain = urusanLainList.filter(val => 
     val.toLowerCase().includes(searchUrusanLain.toLowerCase())
   );
 
   const filteredTahapan = uniqueValues.tahapan_inovasi.filter(val => 
     val.toLowerCase().includes(searchTahapan.toLowerCase())
   );
+
+  // Toggle urusan lain (multi-select)
+  const toggleUrusanLain = (urusan: string) => {
+    setSelectedUrusanLain(prev => {
+      if (prev.includes(urusan)) {
+        return prev.filter(item => item !== urusan);
+      } else {
+        return [...prev, urusan];
+      }
+    });
+  };
 
   // Simpan data ke database
   const handleSubmit = async (e: React.FormEvent) => {
@@ -181,9 +193,15 @@ export function AddData({ darkMode, onClose, onSuccess }: AddDataProps) {
     setError(null);
 
     try {
+      // Gabungkan urusan lain jadi string
+      const dataToSubmit = {
+        ...formData,
+        urusan_lain_yang_beririsan: selectedUrusanLain.join(', '),
+      };
+
       const { data, error: insertError } = await supabase
         .from('inovasi_daerah')
-        .insert([formData])
+        .insert([dataToSubmit])
         .select();
 
       if (insertError) {
@@ -555,46 +573,79 @@ export function AddData({ darkMode, onClose, onSuccess }: AddDataProps) {
               )}
             </div>
 
-            {/* Urusan Lain yang Beririsan - Searchable Dropdown */}
-            <div className="relative">
+            {/* Urusan Lain yang Beririsan - Multi Select */}
+            <div className="relative md:col-span-2">
               <label className={`block text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                Urusan Lain Yang Beririsan
+                Urusan Lain Yang Beririsan (bisa pilih lebih dari 1)
               </label>
               <div className="relative">
                 <input
                   type="text"
                   disabled={loading}
-                  value={formData.urusan_lain_yang_beririsan || searchUrusanLain}
+                  value={searchUrusanLain}
                   onChange={(e) => {
                     setSearchUrusanLain(e.target.value);
-                    setFormData({ ...formData, urusan_lain_yang_beririsan: e.target.value });
                     setShowUrusanLainDropdown(true);
                   }}
                   onFocus={() => !loading && setShowUrusanLainDropdown(true)}
+                  onBlur={() => {
+                    // Delay biar klik item di dropdown sempat ke-trigger
+                    setTimeout(() => setShowUrusanLainDropdown(false), 200);
+                  }}
                   className={`w-full px-3 py-2 pr-10 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
                     darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800'
                   }`}
-                  placeholder="Cari atau pilih urusan lain (opsional)"
+                  placeholder="Cari urusan lain..."
                 />
                 <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
               </div>
-              {showUrusanLainDropdown && filteredUrusanLain.length > 0 && !loading && (
-                <div className={`absolute z-20 w-full mt-1 max-h-60 overflow-y-auto rounded-lg border shadow-lg ${
-                  darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'
-                }`}>
-                  {filteredUrusanLain.map((urusan, index) => (
-                    <div
+              
+              {/* Selected items */}
+              {selectedUrusanLain.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selectedUrusanLain.map((urusan, index) => (
+                    <span
                       key={index}
-                      onClick={() => {
-                        setFormData({ ...formData, urusan_lain_yang_beririsan: urusan });
-                        setSearchUrusanLain('');
-                        setShowUrusanLainDropdown(false);
-                      }}
-                      className={`px-3 py-2 cursor-pointer transition-colors ${
-                        darkMode ? 'hover:bg-gray-600 text-gray-200' : 'hover:bg-gray-100 text-gray-800'
+                      className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm ${
+                        darkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-100 text-blue-700'
                       }`}
                     >
                       {urusan}
+                      <button
+                        type="button"
+                        onClick={() => toggleUrusanLain(urusan)}
+                        className="hover:text-red-500"
+                      >
+                        <X size={14} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              
+              {/* Dropdown */}
+              {showUrusanLainDropdown && filteredUrusanLain.length > 0 && !loading && (
+                <div 
+                  onMouseDown={(e) => e.preventDefault()}
+                  className={`absolute z-20 w-full mt-1 max-h-60 overflow-y-auto rounded-lg border shadow-lg ${
+                    darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'
+                  }`}
+                >
+                  {filteredUrusanLain.map((val, index) => (
+                    <div
+                      key={index}
+                      onClick={() => {
+                        toggleUrusanLain(val);
+                        setSearchUrusanLain('');
+                      }}
+                      className={`px-3 py-2 cursor-pointer transition-colors flex items-center justify-between ${
+                        darkMode ? 'hover:bg-gray-600 text-gray-200' : 'hover:bg-gray-100 text-gray-800'
+                      } ${selectedUrusanLain.includes(val) ? (darkMode ? 'bg-blue-900/30' : 'bg-blue-50') : ''}`}
+                    >
+                      <span>{val}</span>
+                      {selectedUrusanLain.includes(val) && (
+                        <CheckCircle size={16} className="text-blue-500" />
+                      )}
                     </div>
                   ))}
                 </div>

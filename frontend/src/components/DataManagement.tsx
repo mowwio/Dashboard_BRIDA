@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Download, Search, FileText, X, Eye, CheckSquare, Square, ChevronUp, ChevronDown, AlertTriangle, Loader2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Download, Search, X, Eye, CheckSquare, Square, ChevronUp, ChevronDown, AlertTriangle, Loader2 } from 'lucide-react';
 import { supabase, InovasiDaerah } from '../lib/supabase';
 import { AddData } from './AddData';
 import { EditData } from './EditData';
 import { DetailViewModal } from './DetailViewModal';
+import * as XLSX from 'xlsx';
 
 interface DataManagementProps {
   darkMode: boolean;
@@ -269,7 +270,24 @@ export function DataManagement({ darkMode, isLoggedIn }: DataManagementProps) {
   };
 
   const handleExport = (format: string) => {
-    alert(`Export data dalam format ${format} (implementasi export sebenarnya diperlukan)`);
+    if (format === 'Excel') {
+      // Export ke Excel
+      const worksheet = XLSX.utils.json_to_sheet(filteredData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Data Inovasi');
+      XLSX.writeFile(workbook, `Data_Inovasi_${new Date().toISOString().split('T')[0]}.xlsx`);
+    } else if (format === 'CSV') {
+      // Export ke CSV
+      const worksheet = XLSX.utils.json_to_sheet(filteredData);
+      const csv = XLSX.utils.sheet_to_csv(worksheet);
+      
+      // Download file
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `Data_Inovasi_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+    }
   };
 
   const handleView = (item: InovasiDaerah) => {
@@ -331,20 +349,6 @@ export function DataManagement({ darkMode, isLoggedIn }: DataManagementProps) {
           >
             <Download size={18} />
             <span className="hidden sm:inline">CSV</span>
-          </button>
-          <button
-            onClick={() => handleExport('JSON')}
-            className="flex items-center gap-2 bg-purple-500 text-white px-3 md:px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors text-sm"
-          >
-            <FileText size={18} />
-            <span className="hidden sm:inline">JSON</span>
-          </button>
-          <button
-            onClick={() => handleExport('PDF')}
-            className="flex items-center gap-2 bg-red-500 text-white px-3 md:px-4 py-2 rounded-lg hover:bg-red-600 transition-colors text-sm"
-          >
-            <FileText size={18} />
-            <span className="hidden sm:inline">PDF</span>
           </button>
         </div>
       </div>
