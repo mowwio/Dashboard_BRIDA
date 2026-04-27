@@ -1,6 +1,6 @@
 This project was engineered from end-to-end (UI/UX, Frontend, Backend API, and AI Integration) by:
-1. Dea Kayla - Applied Data Science, Politeknik Elektronika Negeri Surabaya (PENS)
-2. Dinda Ayu - Applied Data Science, Politeknik Elektronika Negeri Surabaya (PENS)
+1. Dea Kayla Putri Darusman - Applied Data Science, Politeknik Elektronika Negeri Surabaya (PENS)
+2. Dinda Ayu Permatasari - Applied Data Science, Politeknik Elektronika Negeri Surabaya (PENS)
 
 Completed during the Professional Internship Program (Kerja Praktik) at BRIDA Jatim, Jan-Apr 2026.
 
