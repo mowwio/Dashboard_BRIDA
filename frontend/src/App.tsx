@@ -5,8 +5,13 @@ import { Analytics } from './components/Analytics';
 import { MapInnovation } from './components/MapInnovation';
 import { AIChatbot } from './components/AIChatbot';
 import { DataManagement } from './components/DataManagement';
-import { LayoutDashboard, BarChart3, MapPin, Bot, Database, Menu, User, LogOut } from 'lucide-react';
-import logo from 'figma:asset/3554ecab8b87e1a4e26b58997b7d2614ae189b80.png';
+import { LayoutDashboard, BarChart3, MapPin, Bot, Database, Menu, User, LogOut, Loader2, Eye, EyeOff } from 'lucide-react';
+
+// Token JWT di sessionStorage (hilang otomatis saat tab ditutup)
+const TOKEN_KEY = 'admin_jwt_token';
+const getToken = () => sessionStorage.getItem(TOKEN_KEY);
+const saveToken = (t: string) => sessionStorage.setItem(TOKEN_KEY, t);
+const removeToken = () => sessionStorage.removeItem(TOKEN_KEY);
 
 // BRIDA Jatim Dashboard Application
 export default function App() {
@@ -18,12 +23,18 @@ export default function App() {
     return localStorage.getItem('darkMode') === 'true';
   });
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    return localStorage.getItem('isLoggedIn') === 'true';
-  });
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!getToken());
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [showLoginForm, setShowLoginForm] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
+  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
+  };
   
   // NEW: useEffect to close profile menu when clicking outside
   useEffect(() => {
@@ -46,6 +57,13 @@ export default function App() {
     };
   }, [profileMenuOpen]);
 
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      localStorage.removeItem('activePage');
+      setActivePage('landing');
+    }
+  }, []);
+
   // Save active page to localStorage
   useEffect(() => {
     if (activePage !== 'landing') {
@@ -57,11 +75,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('darkMode', darkMode.toString());
   }, [darkMode]);
-
-  // Save login status
-  useEffect(() => {
-    localStorage.setItem('isLoggedIn', isLoggedIn.toString());
-  }, [isLoggedIn]);
 
   const navigation = [
     { id: 'home', name: 'Dashboard', icon: LayoutDashboard },
@@ -77,34 +90,59 @@ export default function App() {
         return <LandingPage onEnter={() => setActivePage('home')} darkMode={darkMode} setDarkMode={setDarkMode} />;
       case 'home':
         return <Home darkMode={darkMode} />;
-      case 'analytics':
+      case 'analytics' :
         return <Analytics darkMode={darkMode} />;
       case 'map':
+        // --- PERBAIKAN: Memanggil PetaInovasiCluster, bukan MapInnovation ---
         return <MapInnovation darkMode={darkMode} />;
       case 'ai-chatbot':
         return <AIChatbot darkMode={darkMode} />;
       case 'data':
-        return <DataManagement darkMode={darkMode} isLoggedIn={isLoggedIn} />;
+        return <DataManagement darkMode={darkMode} isLoggedIn={isLoggedIn} onLoginSuccess={() => { setIsLoggedIn(true); showToast('Login berhasil! Selamat datang, Admin.'); }} />;
       default:
         return <Home darkMode={darkMode} />;
     }
   };
 
-  const handleLogin = () => {
-    if (loginForm.username === 'admin' && loginForm.password === 'admin123') {
+  // ✅ Login via backend auth.py — tidak ada hardcode credentials
+  const handleLogin = async () => {
+    if (!loginForm.username || !loginForm.password) {
+      setLoginError('Username dan password harus diisi');
+      return;
+    }
+    setIsLoggingIn(true);
+    setLoginError('');
+    try {
+      const res = await fetch('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: loginForm.username, password: loginForm.password }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setLoginError(err.detail || 'Username atau password salah');
+        return;
+      }
+      const { token } = await res.json();
+      saveToken(token);
       setIsLoggedIn(true);
       setShowLoginForm(false);
       setProfileMenuOpen(false);
       setLoginError('');
       setLoginForm({ username: '', password: '' });
-    } else {
-      setLoginError('Username atau password salah!');
+      showToast('Login berhasil! Selamat datang, Admin.');
+    } catch {
+      setLoginError('Gagal terhubung ke server. Coba lagi.');
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
   const handleLogout = () => {
+    removeToken();
     setIsLoggedIn(false);
     setProfileMenuOpen(false);
+    showToast('Berhasil logout.', 'success');
   };
 
   if (activePage === 'landing') {
@@ -133,7 +171,7 @@ export default function App() {
                 <Menu size={20} />
               </button>
               <div className="flex items-center">
-                <img src={logo} alt="BRIDA Jatim" className="h-10 md:h-12 w-auto" />
+                <img src="/images/logo-brida-jatim.png" alt="BRIDA Jatim" className="h-10 md:h-12 w-auto" />
               </div>
             </div>
             
@@ -226,29 +264,53 @@ export default function App() {
                           placeholder="Username"
                           value={loginForm.username}
                           onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && loginForm.username) {
+                              e.preventDefault();
+                              document.getElementById('app-password-input')?.focus();
+                            }
+                          }}
+                          autoFocus
+                          autoComplete="username"
                           className={`w-full px-3 py-2 border rounded-lg mb-2 text-sm ${
                             darkMode ? 'bg-gray-600 border-gray-500 text-white' : 'bg-white border-gray-300'
                           }`}
                         />
-                        <input
-                          type="password"
-                          placeholder="Password"
-                          value={loginForm.password}
-                          onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                          className={`w-full px-3 py-2 border rounded-lg mb-3 text-sm ${
-                            darkMode ? 'bg-gray-600 border-gray-500 text-white' : 'bg-white border-gray-300'
-                          }`}
-                        />
+                        <div className="relative mb-3">
+                          <input
+                            id="app-password-input"
+                            type={showPassword ? "text" : "password"}
+                            placeholder="Password"
+                            value={loginForm.password}
+                            onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                            onKeyDown={(e) => e.key === 'Enter' && !isLoggingIn && handleLogin()}
+                            autoComplete="current-password"
+                            className={`w-full px-3 py-2 pr-10 border rounded-lg text-sm ${
+                              darkMode ? 'bg-gray-600 border-gray-500 text-white' : 'bg-white border-gray-300'
+                            }`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                            tabIndex={-1}
+                          >
+                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
                         <div className="flex gap-2">
                           <button
                             onClick={handleLogin}
-                            className="flex-1 bg-blue-500 text-white px-3 py-2 rounded-lg hover:bg-blue-600 transition-colors text-sm"
+                            disabled={isLoggingIn}
+                            className="flex-1 bg-blue-500 text-white px-3 py-2 rounded-lg hover:bg-blue-600 transition-colors text-sm flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
                           >
-                            Login
+                            {isLoggingIn && <Loader2 size={14} className="animate-spin" />}
+                            {isLoggingIn ? 'Masuk...' : 'Login'}
                           </button>
                           <button
                             onClick={() => {
                               setShowLoginForm(false);
+                              setShowPassword(false);
                               setLoginError('');
                             }}
                             className={`flex-1 px-3 py-2 rounded-lg transition-colors text-sm ${
@@ -322,16 +384,55 @@ export default function App() {
         {/* Main Content */}
         <main
           className={`flex-1 transition-all duration-300 ${
-
             sidebarOpen ? 'ml-0 lg:ml-64' : 'ml-0'
-
           } p-4 md:p-6 pt-6 pb-0 overflow-x-hidden`}
-
         >
           {renderPage()}
         </main>
       </div>
 
+
+      {/* TOAST NOTIFICATION */}
+      {toast.show && (
+        <div style={{
+          position: 'fixed',
+          top: '70px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 999999,
+          animation: 'toastIn .3s cubic-bezier(.34,1.56,.64,1)',
+          pointerEvents: 'none',
+        }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '10px',
+            background: toast.type === 'success' ? '#fff' : '#fff',
+            borderRadius: '12px',
+            padding: '12px 20px',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+            border: `1.5px solid ${toast.type === 'success' ? '#22c55e' : '#ef4444'}`,
+            minWidth: '260px',
+            whiteSpace: 'nowrap',
+          }}>
+            <div style={{
+              width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
+              background: toast.type === 'success' ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#ef4444,#dc2626)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {toast.type === 'success'
+                ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              }
+            </div>
+            <span style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>{toast.message}</span>
+          </div>
+        </div>
+      )}
+      <style>{`
+        @keyframes toastIn {
+          from { opacity: 0; transform: translateX(-50%) translateY(-16px); }
+          to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+      `}</style>
       <style>{`
         @keyframes float {
           0%, 100% {

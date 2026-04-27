@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Save, Search, AlertCircle, CheckCircle } from 'lucide-react';
+import { X, Save, Search, AlertCircle, CheckCircle, MapPin, Loader2 } from 'lucide-react';
 import { supabase, InovasiDaerah } from '../lib/supabase';
 
 interface EditDataProps {
@@ -52,7 +52,41 @@ const urusanLainList = [
 
 export function EditData({ darkMode, data, onClose, onSubmit }: EditDataProps) {
   // State form dengan data existing
-  const [formData, setFormData] = useState<InovasiDaerah>(data);
+  const [formData, setFormData] = useState<InovasiDaerah>({
+    ...data,
+    judul_inovasi:              data.judul_inovasi              ?? '',
+    pemda:                      data.pemda                      ?? '',
+    admin_opd:                  data.admin_opd                  ?? '',
+    inisiator:                  data.inisiator                  ?? '',
+    nama_inisiator:             data.nama_inisiator             ?? '',
+    bentuk_inovasi:             data.bentuk_inovasi             ?? '',
+    jenis:                      data.jenis                      ?? '',
+    asta_cipta:                 data.asta_cipta                 ?? '',
+    urusan_utama:               data.urusan_utama               ?? '',
+    urusan_lain_yang_beririsan: data.urusan_lain_yang_beririsan ?? '',
+    tahapan_inovasi:            data.tahapan_inovasi            ?? '',
+    tanggal_input:              data.tanggal_input              ?? '',
+    tanggal_penerapan:          data.tanggal_penerapan          ?? '',
+    tanggal_pengembangan:       data.tanggal_pengembangan       ?? '',
+    video:                      data.video                      ?? 'Tidak',
+    link_video:                 data.link_video                 ?? '',
+    label_kematangan:           data.label_kematangan           ?? '',
+    // ── lat/lon: tampilkan existing jika valid, kosong jika null/0 ──
+    lat: (data.lat != null && data.lat !== 0) ? data.lat : '' as any,
+    lon: (data.lon != null && data.lon !== 0) ? data.lon : '' as any,
+    kematangan:                 data.kematangan                 ?? 0,
+    deskripsi:                  data.deskripsi                  ?? '',
+  });
+
+  // ── State GPS ──────────────────────────────────────────────
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const [gpsError,   setGpsError]   = useState<string | null>(null);
+  // ── Validasi lat/lon ───────────────────────────────────────
+  const [latError, setLatError] = useState<string | null>(null);
+  const [lonError, setLonError] = useState<string | null>(null);
+
+  // Cek apakah data existing punya koordinat valid
+  const hasExistingCoords = data.lat != null && data.lat !== 0 && data.lon != null && data.lon !== 0;
 
   // State untuk data unik dari database
   const [uniqueValues, setUniqueValues] = useState({
@@ -99,7 +133,7 @@ export function EditData({ darkMode, data, onClose, onSubmit }: EditDataProps) {
         setLoadingOptions(true);
         
         const { data: allData, error } = await supabase
-          .from('inovasi_daerah')
+          .from('data_inovasi')
           .select('inisiator, bentuk_inovasi, jenis, asta_cipta, urusan_utama, tahapan_inovasi');
 
         if (error) throw error;
@@ -168,24 +202,118 @@ export function EditData({ darkMode, data, onClose, onSubmit }: EditDataProps) {
     });
   };
 
+  // ── Fungsi GPS ─────────────────────────────────────────────
+  const handleGetGPS = () => {
+    if (!navigator.geolocation) {
+      setGpsError('Browser tidak mendukung GPS');
+      return;
+    }
+    setGpsLoading(true);
+    setGpsError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = parseFloat(pos.coords.latitude.toFixed(6));
+        const lon = parseFloat(pos.coords.longitude.toFixed(6));
+        setFormData(prev => ({ ...prev, lat, lon }));
+        setLatError(null);
+        setLonError(null);
+        setGpsLoading(false);
+      },
+      (err) => {
+        setGpsError(
+          err.code === 1 ? 'Akses lokasi ditolak. Izinkan lokasi di browser.' :
+          err.code === 2 ? 'Lokasi tidak tersedia.' :
+          'Timeout. Coba lagi.'
+        );
+        setGpsLoading(false);
+      },
+      { timeout: 10000, enableHighAccuracy: true }
+    );
+  };
+
+  // ── Validasi lat/lon saat blur ─────────────────────────────
+  const validateLat = (val: any) => {
+    const num = parseFloat(val);
+    if (val === '' || val === null || val === undefined || isNaN(num)) {
+      setLatError('Latitude wajib diisi');
+    } else if (num < -90 || num > 90) {
+      setLatError('Latitude harus antara -90 dan 90');
+    } else {
+      setLatError(null);
+    }
+  };
+
+  const validateLon = (val: any) => {
+    const num = parseFloat(val);
+    if (val === '' || val === null || val === undefined || isNaN(num)) {
+      setLonError('Longitude wajib diisi');
+    } else if (num < -180 || num > 180) {
+      setLonError('Longitude harus antara -180 dan 180');
+    } else {
+      setLonError(null);
+    }
+  };
+
   // Submit form ke parent component
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    // ── Validasi lat/lon sebelum submit ───────────────────────
+    const latNum = parseFloat(String(formData.lat));
+    const lonNum = parseFloat(String(formData.lon));
+    if (formData.lat === '' || formData.lat === null || isNaN(latNum)) {
+      setLatError('Latitude wajib diisi');
+      return;
+    }
+    if (formData.lon === '' || formData.lon === null || isNaN(lonNum)) {
+      setLonError('Longitude wajib diisi');
+      return;
+    }
+    if (latNum < -90 || latNum > 90) {
+      setLatError('Latitude harus antara -90 dan 90');
+      return;
+    }
+    if (lonNum < -180 || lonNum > 180) {
+      setLonError('Longitude harus antara -180 dan 180');
+      return;
+    }
+
     // Gabungkan urusan lain jadi string
     const dataToSubmit = {
       ...formData,
+      lat: latNum,
+      lon: lonNum,
       urusan_lain_yang_beririsan: selectedUrusanLain.join(', '),
+      // ── FIX: konversi string kosong ke null agar PostgreSQL tidak error ──
+      tanggal_input:        formData.tanggal_input        || null,
+      tanggal_penerapan:    formData.tanggal_penerapan    || null,
+      tanggal_pengembangan: formData.tanggal_pengembangan || null,
+      link_video:           formData.link_video           || null,
+      deskripsi:            formData.deskripsi?.trim()    || null,
     };
     
     onSubmit(dataToSubmit);
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className={`rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto ${
+    // ✅ FIX BLUR: ganti className ke inline style dengan dimensi eksplisit agar blur full screen tanpa gap
+    <div
+      style={{
+        position: 'fixed',
+        top: 0, left: 0, right: 0, bottom: 0,
+        width: '100vw', height: '100vh',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        backgroundColor: 'rgba(100,116,139,0.35)',
+        zIndex: 50,
+        margin: 0, padding: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        overflowY: 'auto',
+      }}
+    >
+      <div className={`rounded-2xl shadow-2xl ring-1 ring-black/10 w-full max-w-4xl max-h-[90vh] overflow-y-auto ${
         darkMode ? 'bg-gray-800' : 'bg-white'
-      }`}>
+      }`} style={{ margin: '16px' }}>
         {/* Header */}
         <div className={`sticky top-0 z-10 p-6 border-b flex items-center justify-between ${
           darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
@@ -239,6 +367,24 @@ export function EditData({ darkMode, data, onClose, onSubmit }: EditDataProps) {
                 }`}
                 placeholder="Masukkan judul inovasi"
               />
+            </div>
+
+            {/* Deskripsi Inovasi */}
+            <div className="md:col-span-2">
+              <label className={`block text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Deskripsi Inovasi</label>
+              <textarea
+                disabled={loading}
+                value={formData.deskripsi || ''}
+                onChange={(e) => setFormData({ ...formData, deskripsi: e.target.value })}
+                rows={4}
+                placeholder="Jelaskan secara detail tentang inovasi ini..."
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 resize-none ${
+                  darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-300 text-gray-800 placeholder-gray-500'
+                }`}
+              />
+              <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                Opsional — tambahkan informasi detail mengenai latar belakang, tujuan, dan manfaat inovasi
+              </p>
             </div>
 
             {/* Pemda */}
@@ -805,43 +951,117 @@ export function EditData({ darkMode, data, onClose, onSubmit }: EditDataProps) {
               />
             </div>
 
-            {/* Latitude */}
-            <div>
-              <label className={`block text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                Latitude *
-              </label>
-              <input
-                type="number"
-                required
-                disabled={loading}
-                step="0.000001"
-                value={formData.lat}
-                onChange={(e) => setFormData({ ...formData, lat: Number(e.target.value) })}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
-                  darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800'
-                }`}
-                placeholder="-7.2575"
-              />
-            </div>
+            {/* ── KOORDINAT LOKASI — direvisi ── */}
+            <div className="md:col-span-2">
+              {/* Header + badge status + tombol GPS */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <label className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Koordinat Lokasi *
+                  </label>
+                  {/* Badge: ada atau tidak koordinat dari DB */}
+                  {hasExistingCoords ? (
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      darkMode ? 'bg-green-900/40 text-green-400' : 'bg-green-100 text-green-700'
+                    }`}>
+                      ✓ Koordinat tersedia
+                    </span>
+                  ) : (
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      darkMode ? 'bg-orange-900/40 text-orange-400' : 'bg-orange-100 text-orange-700'
+                    }`}>
+                      ⚠ Koordinat belum diisi
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleGetGPS}
+                  disabled={loading || gpsLoading}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
+                    darkMode
+                      ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                      : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200'
+                  }`}
+                >
+                  {gpsLoading
+                    ? <><Loader2 size={15} className="animate-spin" /> Mendeteksi...</>
+                    : <><MapPin size={15} /> Gunakan Lokasi Saya</>
+                  }
+                </button>
+              </div>
 
-            {/* Longitude */}
-            <div>
-              <label className={`block text-sm mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                Longitude *
-              </label>
-              <input
-                type="number"
-                required
-                disabled={loading}
-                step="0.000001"
-                value={formData.lon}
-                onChange={(e) => setFormData({ ...formData, lon: Number(e.target.value) })}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 ${
-                  darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800'
-                }`}
-                placeholder="112.7521"
-              />
+              {/* GPS error */}
+              {gpsError && (
+                <div className="mb-3 flex items-center gap-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg text-orange-700 text-sm">
+                  <AlertCircle size={15} />
+                  {gpsError}
+                </div>
+              )}
+
+              {/* Input lat & lon */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={`block text-xs mb-1.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Latitude <span className="text-red-500">*</span>
+                    <span className={`ml-1 font-normal ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>(-90 s/d 90)</span>
+                  </label>
+                  <input
+                    type="number"
+                    disabled={loading}
+                    step="0.000001"
+                    placeholder="Contoh: -7.257500"
+                    value={formData.lat}
+                    onChange={(e) => {
+                      setFormData({ ...formData, lat: e.target.value as any });
+                      setLatError(null);
+                    }}
+                    onBlur={(e) => validateLat(e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 disabled:opacity-50 ${
+                      latError
+                        ? 'border-red-400 focus:ring-red-400'
+                        : 'focus:ring-blue-500 ' + (darkMode ? 'border-gray-600' : 'border-gray-300')
+                    } ${darkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-800'}`}
+                  />
+                  {latError && (
+                    <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                      <AlertCircle size={12} /> {latError}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className={`block text-xs mb-1.5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Longitude <span className="text-red-500">*</span>
+                    <span className={`ml-1 font-normal ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>(-180 s/d 180)</span>
+                  </label>
+                  <input
+                    type="number"
+                    disabled={loading}
+                    step="0.000001"
+                    placeholder="Contoh: 112.752100"
+                    value={formData.lon}
+                    onChange={(e) => {
+                      setFormData({ ...formData, lon: e.target.value as any });
+                      setLonError(null);
+                    }}
+                    onBlur={(e) => validateLon(e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 disabled:opacity-50 ${
+                      lonError
+                        ? 'border-red-400 focus:ring-red-400'
+                        : 'focus:ring-blue-500 ' + (darkMode ? 'border-gray-600' : 'border-gray-300')
+                    } ${darkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-800'}`}
+                  />
+                  {lonError && (
+                    <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                      <AlertCircle size={12} /> {lonError}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
+            {/* ── END KOORDINAT ── */}
+
           </div>
 
           {/* Action Buttons */}

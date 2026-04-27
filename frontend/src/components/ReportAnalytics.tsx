@@ -1,766 +1,654 @@
 import { useEffect, useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
-import logo from 'figma:asset/3554ecab8b87e1a4e26b58997b7d2614ae189b80.png';
-
-// Data matching the actual Analytics component
-const urusanTahapanData = [
-  { urusan: 'Kesehatan', inisiatif: 15, ujiCoba: 28, penerapan: 35 },
-  { urusan: 'Pendidikan', inisiatif: 12, ujiCoba: 23, penerapan: 30 },
-  { urusan: 'Komunikasi & Informatika', inisiatif: 18, ujiCoba: 16, penerapan: 18 },
-  { urusan: 'Pekerjaan Umum', inisiatif: 10, ujiCoba: 15, penerapan: 20 },
-  { urusan: 'Adm. Kependudukan', inisiatif: 8, ujiCoba: 12, penerapan: 18 },
-  { urusan: 'Perhubungan', inisiatif: 12, ujiCoba: 10, penerapan: 12 },
-  { urusan: 'Lingkungan Hidup', inisiatif: 15, ujiCoba: 8, penerapan: 9 },
-  { urusan: 'Sosial', inisiatif: 10, ujiCoba: 9, penerapan: 10 },
-  { urusan: 'Pertanian', inisiatif: 14, ujiCoba: 6, penerapan: 8 },
-  { urusan: 'Pariwisata', inisiatif: 8, ujiCoba: 7, penerapan: 9 },
-];
-
-const jenisInovasiData = [
-  { name: 'Digital', value: 215, color: '#6366f1' },
-  { name: 'Non-Digital', value: 145, color: '#10b981' },
-  { name: 'Teknologi', value: 70, color: '#f59e0b' },
-];
-
-const bentukInovasiPerInisiatorData = [
-  { inisiator: 'Kepala Daerah', aplikasi: 40, sop: 35, metode: 25 },
-  { inisiator: 'OPD', aplikasi: 55, sop: 30, metode: 15 },
-  { inisiator: 'ASN', aplikasi: 30, sop: 40, metode: 30 },
-  { inisiator: 'Masyarakat', aplikasi: 20, sop: 25, metode: 55 },
-];
-
-const watchlistData = [
-  { nama: 'Sistem Pengaduan Masyarakat v1', inisiator: 'Dinas Kominfo', tahunPenerapan: 2023, skorKematangan: 25 },
-  { nama: 'Program Pemupukan Organik', inisiator: 'Dinas Pertanian', tahunPenerapan: 2022, skorKematangan: 18 },
-  { nama: 'SOP Pelayanan Cepat Kecamatan', inisiator: 'Kepala Daerah', tahunPenerapan: 2023, skorKematangan: 22 },
-  { nama: 'Aplikasi Absensi Manual', inisiator: 'Bappeda', tahunPenerapan: 2022, skorKematangan: 15 },
-  { nama: 'Portal Berita Desa', inisiator: 'Dinas Pemberdayaan Masyarakat', tahunPenerapan: 2023, skorKematangan: 28 },
-];
-
-const getMaturityBadge = (score: number) => {
-  if (score >= 30) {
-    return { label: 'Kurang Matang', color: '#f97316', textColor: '#ffffff' };
-  } else {
-    return { label: 'Perlu Perhatian', color: '#ef4444', textColor: '#ffffff' };
-  }
-};
+import { Document, Page, Text, View, StyleSheet, pdf, Image } from '@react-pdf/renderer';
+import { supabase } from '../lib/supabase';
+import logoBrida from '/images/logo-brida-jatim.png';
 
 interface ReportAnalyticsProps {
   onClose: () => void;
+  filters: { tahun: string };
 }
 
-export function ReportAnalytics({ onClose }: ReportAnalyticsProps) {
-  const [isGenerating, setIsGenerating] = useState(true);
-  const [progress, setProgress] = useState(0);
-  const [statusMessage, setStatusMessage] = useState('Memuat komponen...');
+interface UrusanData {
+  urusan: string;
+  inisiatif: number;
+  ujiCoba: number;
+  penerapan: number;
+  total: number;
+}
 
-  const totalInnovations = jenisInovasiData.reduce((sum, item) => sum + item.value, 0);
+interface JenisData {
+  name: string;
+  value: number;
+  color: string;
+  percentage: number;
+}
 
-  useEffect(() => {
-    const generatePDF = async () => {
-      try {
-        setIsGenerating(true);
-        setProgress(10);
-        setStatusMessage('Menunggu render komponen...');
-        
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        setProgress(30);
-        setStatusMessage('Menunggu grafik selesai dirender...');
-        
-        // Wait longer for charts to fully render with fixed dimensions
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
-        setProgress(50);
-        setStatusMessage('Memverifikasi elemen visual...');
-        
-        // Create PDF with LANDSCAPE orientation for A4
-        const pdf = new jsPDF({
-          orientation: 'landscape',
-          unit: 'mm',
-          format: 'a4'
-        });
-        
-        const pdfWidth = pdf.internal.pageSize.getWidth(); // 297mm
-        const pdfHeight = pdf.internal.pageSize.getHeight(); // 210mm
-        
-        // Process each page
-        const pageIds = ['report-analytics-page-1', 'report-analytics-page-2'];
-        
-        for (let i = 0; i < pageIds.length; i++) {
-          const pageId = pageIds[i];
-          setProgress(50 + (i * 20));
-          setStatusMessage(`Memproses halaman ${i + 1} dari ${pageIds.length}...`);
-          
-          const pageElement = document.getElementById(pageId);
-          if (!pageElement) {
-            console.error(`Page ${pageId} not found`);
-            continue;
-          }
-          
-          const rect = pageElement.getBoundingClientRect();
-          if (rect.width === 0 || rect.height === 0) {
-            console.error(`Page ${pageId} has invalid dimensions:`, rect);
-            continue;
-          }
-          
-          await new Promise(resolve => setTimeout(resolve, 300));
-          
-          // Add temporary style to fix oklch color issue
-          const styleElement = document.createElement('style');
-          styleElement.id = `html2canvas-fix-${pageId}`;
-          styleElement.textContent = `
-            #${pageId},
-            #${pageId} * {
-              color: #1f2937 !important;
-              fill: currentColor !important;
-            }
-            #${pageId} {
-              background-color: #ffffff !important;
-            }
-            #${pageId} .recharts-text {
-              fill: #6b7280 !important;
-            }
-            #${pageId} .recharts-cartesian-grid-horizontal line,
-            #${pageId} .recharts-cartesian-grid-vertical line {
-              stroke: #e5e7eb !important;
-            }
-          `;
-          document.head.appendChild(styleElement);
-          
-          await new Promise(resolve => setTimeout(resolve, 200));
-          
-          // Capture page as canvas
-          const canvas = await html2canvas(pageElement, {
-            scale: 2.5,
-            useCORS: true,
-            allowTaint: true,
-            backgroundColor: '#ffffff',
-            logging: false,
-            onclone: (clonedDoc) => {
-              // Ensure all elements are visible in cloned document
-              const clonedElement = clonedDoc.getElementById(pageId);
-              if (clonedElement) {
-                clonedElement.style.display = 'block';
-                clonedElement.style.visibility = 'visible';
-                clonedElement.style.opacity = '1';
-              }
-            }
-          });
-          
-          // Remove temporary style
-          const tempStyle = document.getElementById(`html2canvas-fix-${pageId}`);
-          if (tempStyle) {
-            tempStyle.remove();
-          }
-          
-          const imgData = canvas.toDataURL('image/png', 1.0);
-          
-          // Add new page if not first page
-          if (i > 0) {
-            pdf.addPage();
-          }
-          
-          // Apply safe margins (20mm on all sides)
-          const margin = 20;
-          const contentWidth = pdfWidth - (margin * 2); // 257mm
-          const contentHeight = pdfHeight - (margin * 2); // 170mm
-          
-          // Calculate image dimensions to fit within content area while maintaining aspect ratio
-          const canvasAspect = canvas.height / canvas.width;
-          let imgWidth = contentWidth;
-          let imgHeight = contentWidth * canvasAspect;
-          
-          // If height exceeds content area, scale down based on height
-          if (imgHeight > contentHeight) {
-            imgHeight = contentHeight;
-            imgWidth = contentHeight / canvasAspect;
-          }
-          
-          // Center the image if it's smaller than content area
-          const xOffset = margin + (contentWidth - imgWidth) / 2;
-          const yOffset = margin + (contentHeight - imgHeight) / 2;
-          
-          // Add image to PDF
-          pdf.addImage(
-            imgData,
-            'PNG',
-            xOffset,
-            yOffset,
-            imgWidth,
-            imgHeight,
-            undefined,
-            'FAST'
-          );
-        }
-        
-        setProgress(95);
-        setStatusMessage('Menyimpan file...');
-        
-        const fileName = `BRIDA_Analytics_Report_${new Date().toISOString().split('T')[0]}.pdf`;
-        pdf.save(fileName);
-        
-        setProgress(100);
-        setStatusMessage('Selesai!');
-        
-        setTimeout(() => {
-          onClose();
-        }, 500);
-        
-      } catch (error) {
-        console.error('Error generating PDF:', error);
-        alert('Terjadi kesalahan saat membuat PDF. Silakan coba lagi.');
-        onClose();
-      } finally {
-        setIsGenerating(false);
-      }
-    };
-    
-    const timer = setTimeout(() => {
-      generatePDF();
-    }, 500);
-    
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [onClose]);
+interface BentukData {
+  inisiator: string;
+  [key: string]: any;
+}
+
+interface WatchlistData {
+  nama: string;
+  inisiator: string;
+  tahunPenerapan: number | string;
+  skorKematangan: number;
+}
+
+interface AIInsight {
+  icon: string;
+  text: string;
+  type: string;
+}
+
+const styles = StyleSheet.create({
+  page: {
+    paddingTop: 25,
+    paddingHorizontal: 28,
+    paddingBottom: 52,
+    fontSize: 10,
+    fontFamily: 'Helvetica',
+    backgroundColor: '#ffffff',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingBottom: 10,
+    borderBottomWidth: 3,
+    borderBottomColor: '#2563EB',
+  },
+  logo: {
+    width: 38,
+    height: 46,
+    marginRight: 12,
+    objectFit: 'contain',
+  },
+  headerText: { flex: 1 },
+  title: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 3,
+  },
+  subtitle: { fontSize: 8, color: '#6b7280' },
+  footer: {
+    position: 'absolute',
+    bottom: 16,
+    left: 28,
+    right: 28,
+    textAlign: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    paddingTop: 5,
+  },
+  footerTitle: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 1,
+  },
+  footerText: { fontSize: 7, color: '#9ca3af' },
+  filterBox: {
+    backgroundColor: '#f0f9ff',
+    padding: 7,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#93c5fd',
+    marginBottom: 10,
+    flexDirection: 'row',
+    gap: 20,
+  },
+  filterItem: { flexDirection: 'row', gap: 5 },
+  filterLabel: { fontSize: 8, color: '#6b7280' },
+  filterValue: { fontSize: 8, color: '#1f2937', fontWeight: 'bold' },
+  twoCol: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+  colLeft: { flex: 1.1 },
+  colRight: { flex: 0.9 },
+  section: {
+    backgroundColor: '#f9fafb',
+    padding: 10,
+    borderRadius: 6,
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 7,
+  },
+  chartBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  barLabel: {
+    width: 115,
+    fontSize: 8,
+    color: '#374151',
+    paddingRight: 6,
+  },
+  barContainer: {
+    flex: 1,
+    height: 14,
+    flexDirection: 'row',
+    backgroundColor: '#e5e7eb',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  barSegment: { height: '100%' },
+  barValue: {
+    width: 28,
+    fontSize: 8,
+    color: '#1f2937',
+    fontWeight: 'bold',
+    textAlign: 'right',
+    paddingLeft: 5,
+  },
+  legend: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 7,
+    justifyContent: 'center',
+  },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  legendColor: { width: 9, height: 9, borderRadius: 2 },
+  legendText: { fontSize: 8, color: '#374151' },
+  jenisGrid: { flexDirection: 'row', gap: 7, marginTop: 6 },
+  jenisCard: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    padding: 8,
+    borderRadius: 5,
+    borderWidth: 2,
+    alignItems: 'center',
+  },
+  jenisName: { fontSize: 8, color: '#6b7280', marginBottom: 3, textAlign: 'center' },
+  jenisValue: { fontSize: 20, fontWeight: 'bold', marginBottom: 2 },
+  jenisPercent: { fontSize: 13, fontWeight: 'bold' },
+  jenisLabel: { fontSize: 7, color: '#9ca3af' },
+  aiSection: {
+    backgroundColor: '#eff6ff',
+    padding: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#93c5fd',
+    marginBottom: 10,
+  },
+  aiTitle: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#1e40af',
+    marginBottom: 7,
+  },
+  aiCard: {
+    backgroundColor: '#ffffff',
+    padding: 7,
+    borderRadius: 4,
+    marginBottom: 5,
+    borderLeftWidth: 3,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 4,
+  },
+  aiNum: { fontSize: 8, fontWeight: 'bold', color: '#93c5fd', width: 18 },
+  aiText: { flex: 1, fontSize: 8, color: '#374151', lineHeight: 1.4 },
+  watchlistHeader: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 7,
+    borderLeftWidth: 3,
+    borderLeftColor: '#ef4444',
+    paddingLeft: 7,
+  },
+  watchlistContainer: {
+    backgroundColor: '#fef2f2',
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+    overflow: 'hidden',
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#fee2e2',
+    padding: 6,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    padding: 5,
+    borderTopWidth: 1,
+    borderTopColor: '#fecaca',
+  },
+  tableRowAlt: {
+    flexDirection: 'row',
+    padding: 5,
+    backgroundColor: '#fff5f5',
+    borderTopWidth: 1,
+    borderTopColor: '#fecaca',
+  },
+  tableCell: { fontSize: 7, color: '#374151' },
+  tableCellHeader: { fontSize: 8, color: '#991b1b', fontWeight: 'bold' },
+  badge: {
+    backgroundColor: '#ef4444',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  badgeText: { color: '#ffffff', fontSize: 6, fontWeight: 'bold' },
+});
+
+const PageHeader = ({ pageNum, totalPages }: { pageNum: number; totalPages: number }) => (
+  <View style={styles.header}>
+    <Image src={logoBrida} style={styles.logo} />
+    <View style={styles.headerText}>
+      <Text style={styles.title}>Laporan Analitik Inovasi BRIDA Jawa Timur</Text>
+      <Text style={styles.subtitle}>
+        Tanggal Generate: {new Date().toLocaleDateString('id-ID', {
+          day: 'numeric', month: 'long', year: 'numeric'
+        })} | Halaman {pageNum} dari {totalPages}
+      </Text>
+    </View>
+  </View>
+);
+
+const PageFooter = () => (
+  <View style={styles.footer} fixed>
+    <Text style={styles.footerTitle}>BADAN RISET DAN INOVASI DAERAH PROVINSI JAWA TIMUR</Text>
+    <Text style={styles.footerText}>
+      Jl. Gayung Kebonsari No.56, Gayungan, Kec. Gayungan, Surabaya, Jawa Timur 60235
+    </Text>
+  </View>
+);
+
+const PDFDocument = ({
+  urusanData, jenisData, bentukData, watchlistData, aiInsights, filters, totalInnovations,
+}: any) => {
+  const ROWS_PER_PAGE = 18;
+  const watchlistChunks: WatchlistData[][] = [];
+  for (let i = 0; i < watchlistData.length; i += ROWS_PER_PAGE) {
+    watchlistChunks.push(watchlistData.slice(i, i + ROWS_PER_PAGE));
+  }
+  if (watchlistChunks.length === 0) watchlistChunks.push([]);
+
+  const totalPages = 2 + watchlistChunks.length;
+  const borderColors: Record<string, string> = {
+    success: '#10b981',
+    warning: '#f59e0b',
+    info: '#6366f1',
+  };
 
   return (
-    <div style={{ 
-      position: 'fixed', 
-      inset: 0, 
-      backgroundColor: 'rgba(17, 24, 39, 0.75)', 
-      zIndex: 9999, 
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center', 
-      padding: '16px' 
+    <Document>
+
+      {/* Halaman 1: Grafik */}
+      <Page size="A4" orientation="landscape" style={styles.page}>
+        <PageHeader pageNum={1} totalPages={totalPages} />
+        <View style={styles.filterBox}>
+          <View style={styles.filterItem}>
+            <Text style={styles.filterLabel}>Periode:</Text>
+            <Text style={styles.filterValue}>{filters.tahun}</Text>
+          </View>
+          <View style={styles.filterItem}>
+            <Text style={styles.filterLabel}>Total Inovasi:</Text>
+            <Text style={styles.filterValue}>{totalInnovations}</Text>
+          </View>
+        </View>
+        <View style={styles.twoCol}>
+          <View style={[styles.section, styles.colLeft]}>
+            <Text style={styles.sectionTitle}>Top 5 Urusan Berdasarkan Tahapan</Text>
+            <View style={styles.legend}>
+              {[['#ef4444','Inisiatif'],['#f59e0b','Uji Coba'],['#10b981','Penerapan']].map(([c,l]) => (
+                <View key={l} style={styles.legendItem}>
+                  <View style={[styles.legendColor, { backgroundColor: c }]} />
+                  <Text style={styles.legendText}>{l}</Text>
+                </View>
+              ))}
+            </View>
+            {urusanData.map((item: UrusanData, i: number) => (
+              <View key={i} style={styles.chartBar}>
+                <Text style={styles.barLabel}>{item.urusan}</Text>
+                <View style={styles.barContainer}>
+                  {item.inisiatif > 0 && <View style={[styles.barSegment, { backgroundColor: '#ef4444', width: `${(item.inisiatif/item.total)*100}%` }]} />}
+                  {item.ujiCoba > 0 && <View style={[styles.barSegment, { backgroundColor: '#f59e0b', width: `${(item.ujiCoba/item.total)*100}%` }]} />}
+                  {item.penerapan > 0 && <View style={[styles.barSegment, { backgroundColor: '#10b981', width: `${(item.penerapan/item.total)*100}%` }]} />}
+                </View>
+                <Text style={styles.barValue}>{item.total}</Text>
+              </View>
+            ))}
+          </View>
+          <View style={[styles.section, styles.colRight]}>
+            <Text style={styles.sectionTitle}>Distribusi Jenis Inovasi</Text>
+            <View style={styles.jenisGrid}>
+              {jenisData.map((item: JenisData, i: number) => (
+                <View key={i} style={[styles.jenisCard, { borderColor: item.color }]}>
+                  <Text style={styles.jenisName}>{item.name}</Text>
+                  <Text style={[styles.jenisValue, { color: item.color }]}>{item.value}</Text>
+                  <Text style={[styles.jenisPercent, { color: item.color }]}>{item.percentage.toFixed(1)}%</Text>
+                  <Text style={styles.jenisLabel}>dari total</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Bentuk Inovasi Per Inisiator</Text>
+          {bentukData.length > 0 && (
+            <View style={styles.legend}>
+              {Object.keys(bentukData[0]).filter(k => k !== 'inisiator').map((bentuk, i) => {
+                const colors = ['#6366f1','#10b981','#f59e0b'];
+                return (
+                  <View key={i} style={styles.legendItem}>
+                    <View style={[styles.legendColor, { backgroundColor: colors[i % colors.length] }]} />
+                    <Text style={styles.legendText}>{bentuk}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+          {bentukData.map((item: BentukData, i: number) => {
+            const keys = Object.keys(item).filter(k => k !== 'inisiator');
+            const total = keys.reduce((s, k) => s + (item[k] || 0), 0);
+            const colors = ['#6366f1','#10b981','#f59e0b'];
+            return (
+              <View key={i} style={styles.chartBar}>
+                <Text style={styles.barLabel}>{item.inisiator}</Text>
+                <View style={styles.barContainer}>
+                  {keys.map((bentuk, idx) => {
+                    const w = total > 0 ? (item[bentuk] / total) * 100 : 0;
+                    return w > 0 ? (
+                      <View key={idx} style={[styles.barSegment, { backgroundColor: colors[idx % colors.length], width: `${w}%` }]} />
+                    ) : null;
+                  })}
+                </View>
+                <Text style={styles.barValue}>{total}</Text>
+              </View>
+            );
+          })}
+        </View>
+        <PageFooter />
+      </Page>
+
+      {/* Halaman 2: AI Insight */}
+      <Page size="A4" orientation="landscape" style={styles.page}>
+        <PageHeader pageNum={2} totalPages={totalPages} />
+        <View style={styles.aiSection}>
+          <Text style={styles.aiTitle}>AI Auto Insight — Powered by Google Gemini</Text>
+          {aiInsights && aiInsights.length > 0 ? (
+            aiInsights.map((insight: AIInsight, i: number) => (
+              <View key={i} style={[styles.aiCard, { borderLeftColor: borderColors[insight.type] || '#6366f1' }]}>
+                <Text style={styles.aiNum}>{String(i + 1).padStart(2, '0')}</Text>
+                <Text style={styles.aiText}>{insight.text}</Text>
+              </View>
+            ))
+          ) : (
+            <Text style={{ fontSize: 8, color: '#9ca3af', textAlign: 'center', padding: 12 }}>
+              AI Insight belum tersedia untuk periode ini.
+            </Text>
+          )}
+        </View>
+        <PageFooter />
+      </Page>
+
+      {/* Halaman 3+: Watchlist */}
+      {watchlistChunks.map((chunk, chunkIdx) => (
+        <Page key={`wl-${chunkIdx}`} size="A4" orientation="landscape" style={styles.page}>
+          <PageHeader pageNum={3 + chunkIdx} totalPages={totalPages} />
+          <Text style={styles.watchlistHeader}>
+            Watchlist: Inovasi Perlu Perhatian
+            {watchlistData.length > 0
+              ? `  (${chunkIdx * ROWS_PER_PAGE + 1}–${Math.min((chunkIdx + 1) * ROWS_PER_PAGE, watchlistData.length)} dari ${watchlistData.length})`
+              : ''}
+          </Text>
+          <View style={styles.watchlistContainer}>
+            <View style={styles.tableHeader}>
+              <Text style={[styles.tableCellHeader, { flex: 3 }]}>Nama Inovasi</Text>
+              <Text style={[styles.tableCellHeader, { flex: 2 }]}>OPD</Text>
+              <Text style={[styles.tableCellHeader, { width: 46, textAlign: 'center' }]}>Tahun</Text>
+              <Text style={[styles.tableCellHeader, { width: 40, textAlign: 'center' }]}>Skor</Text>
+              <Text style={[styles.tableCellHeader, { width: 72, textAlign: 'center' }]}>Status</Text>
+            </View>
+            {chunk.length > 0 ? (
+              chunk.map((item: WatchlistData, i: number) => (
+                <View key={i} style={i % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
+                  <Text style={[styles.tableCell, { flex: 3 }]} numberOfLines={2}>
+                    {String(item.nama).length > 55 ? String(item.nama).substring(0, 55) + '...' : item.nama}
+                  </Text>
+                  <Text style={[styles.tableCell, { flex: 2 }]} numberOfLines={1}>
+                    {String(item.inisiator).length > 32 ? String(item.inisiator).substring(0, 32) + '...' : item.inisiator}
+                  </Text>
+                  <Text style={[styles.tableCell, { width: 46, textAlign: 'center' }]}>{item.tahunPenerapan}</Text>
+                  <Text style={[styles.tableCell, { width: 40, textAlign: 'center', fontWeight: 'bold', color: '#ef4444' }]}>
+                    {item.skorKematangan}
+                  </Text>
+                  <View style={{ width: 72, alignItems: 'center' }}>
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>Perlu Perhatian</Text>
+                    </View>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <Text style={{ textAlign: 'center', color: '#6b7280', fontSize: 9, padding: 16 }}>
+                Tidak ada inovasi yang perlu perhatian khusus
+              </Text>
+            )}
+          </View>
+          <PageFooter />
+        </Page>
+      ))}
+
+    </Document>
+  );
+};
+
+export function ReportAnalytics({ onClose, filters }: ReportAnalyticsProps) {
+
+  const [urusanData,   setUrusanData]   = useState<UrusanData[]>([]);
+  const [jenisData,    setJenisData]    = useState<JenisData[]>([]);
+  const [bentukData,   setBentukData]   = useState<BentukData[]>([]);
+  const [watchlistData,setWatchlistData]= useState<WatchlistData[]>([]);
+  const [aiInsights,   setAiInsights]   = useState<AIInsight[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [pdfReady,     setPdfReady]     = useState(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        let query = supabase.from('data_inovasi').select('*');
+        if (filters.tahun !== 'Semua') {
+          const yearStart = `${filters.tahun}-01-01`;
+          const yearEnd   = `${filters.tahun}-12-31`;
+          query = query.gte('tanggal_penerapan', yearStart).lte('tanggal_penerapan', yearEnd);
+        }
+        const { data, error } = await query;
+        if (error) throw error;
+        if (data) {
+          processUrusanData(data);
+          processJenisData(data);
+          processBentukData(data);
+          processWatchlistData(data);
+          await fetchAIInsights();
+        }
+        setLoading(false);
+        setPdfReady(true);
+      } catch (err: any) {
+        console.error('Error:', err);
+        setLoading(false);
+        alert('Gagal mengambil data. Silakan coba lagi.');
+        onClose();
+      }
+    };
+    fetchData();
+  }, [filters]);
+
+  // ── Fetch AI Insight dari tabel ai_insight_cache ───────
+  const fetchAIInsights = async () => {
+    try {
+      const today    = new Date().toISOString().split('T')[0];
+      const cacheKey = `analytics_${filters.tahun}_${today}`;
+
+      const { data, error } = await supabase
+        .from('ai_insight_cache')
+        .select('insight_data')
+        .eq('insight_type', 'analytics')
+        .eq('cache_key', cacheKey)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data?.insight_data) {
+        const insights = typeof data.insight_data === 'string'
+          ? JSON.parse(data.insight_data)
+          : data.insight_data;
+        setAiInsights(insights);
+      }
+    } catch (err) {
+      console.error('AI insights fetch error:', err);
+      setAiInsights([]);
+    }
+  };
+
+  const processUrusanData = (data: any[]) => {
+    const grouped: { [key: string]: { inisiatif: number; ujiCoba: number; penerapan: number } } = {};
+    data.forEach(item => {
+      if (!item.urusan_utama) return;
+      if (!grouped[item.urusan_utama]) grouped[item.urusan_utama] = { inisiatif: 0, ujiCoba: 0, penerapan: 0 };
+      if (item.tahapan_inovasi === 'Inisiatif')   grouped[item.urusan_utama].inisiatif++;
+      else if (item.tahapan_inovasi === 'Uji Coba') grouped[item.urusan_utama].ujiCoba++;
+      else if (item.tahapan_inovasi === 'Penerapan') grouped[item.urusan_utama].penerapan++;
+    });
+    setUrusanData(
+      Object.entries(grouped)
+        .map(([urusan, c]) => ({
+          urusan: urusan.length > 32 ? urusan.substring(0, 32) + '...' : urusan,
+          inisiatif: c.inisiatif, ujiCoba: c.ujiCoba, penerapan: c.penerapan,
+          total: c.inisiatif + c.ujiCoba + c.penerapan,
+        }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5)
+    );
+  };
+
+  const processJenisData = (data: any[]) => {
+    const grouped: { [key: string]: number } = {};
+    data.forEach(item => { if (item.jenis) grouped[item.jenis] = (grouped[item.jenis] || 0) + 1; });
+    const colors: { [key: string]: string } = {
+      'Digital': '#6366f1', 'Non Digital': '#10b981', 'Teknologi': '#f59e0b',
+    };
+    const total = Object.values(grouped).reduce((s, v) => s + v, 0);
+    setJenisData(
+      Object.entries(grouped).map(([name, value]) => ({
+        name, value, color: colors[name] || '#6b7280',
+        percentage: total > 0 ? (value / total) * 100 : 0,
+      }))
+    );
+  };
+
+  const processBentukData = (data: any[]) => {
+    const grouped: { [inisiator: string]: { [bentuk: string]: number } } = {};
+    const shortenBentuk = (b: string) => {
+      if (b.includes('Pelayanan Publik')) return 'Pelayanan Publik';
+      if (b.includes('Tata Kelola'))     return 'Tata Kelola';
+      if (b.includes('Lainnya'))         return 'Lainnya';
+      return b;
+    };
+    data.forEach(item => {
+      if (!item.inisiator || !item.bentuk_inovasi) return;
+      if (!grouped[item.inisiator]) grouped[item.inisiator] = {};
+      const b = shortenBentuk(item.bentuk_inovasi);
+      grouped[item.inisiator][b] = (grouped[item.inisiator][b] || 0) + 1;
+    });
+    setBentukData(
+      Object.entries(grouped).map(([inisiator, counts]) => {
+        const row: any = { inisiator };
+        Object.entries(counts).forEach(([b, n]) => { row[b] = n; });
+        return row;
+      })
+    );
+  };
+
+  // ========================================
+  // WATCHLIST: HANYA FILTER SKOR < 45
+  // ========================================
+  const processWatchlistData = (data: any[]) => {
+    setWatchlistData(
+      data
+        .filter(item => {
+          return (
+            typeof item.kematangan === 'number' &&
+            item.kematangan < 45
+          );
+        })
+        .map(item => ({
+          nama: item.judul_inovasi,
+          inisiator: item.admin_opd,
+          tahunPenerapan: item.tanggal_penerapan
+            ? new Date(item.tanggal_penerapan).getFullYear()
+            : '-',
+          skorKematangan: item.kematangan,
+        }))
+        .sort((a, b) => a.skorKematangan - b.skorKematangan)
+    );
+  };
+
+  const totalInnovations = jenisData.reduce((sum, item) => sum + item.value, 0);
+
+  useEffect(() => {
+    if (pdfReady && urusanData.length > 0) {
+      const downloadPDF = async () => {
+        const blob = await pdf(
+          <PDFDocument
+            urusanData={urusanData}
+            jenisData={jenisData}
+            bentukData={bentukData}
+            watchlistData={watchlistData}
+            aiInsights={aiInsights}
+            filters={filters}
+            totalInnovations={totalInnovations}
+          />
+        ).toBlob();
+        const url  = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href     = url;
+        link.download = `BRIDA_Analytics_Report_${filters.tahun}_${new Date().toISOString().split('T')[0]}.pdf`;
+        link.click();
+        URL.revokeObjectURL(url);
+        setTimeout(() => onClose(), 500);
+      };
+      downloadPDF();
+    }
+  }, [pdfReady, urusanData]);
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0,
+      backgroundColor: 'rgba(17, 24, 39, 0.75)',
+      zIndex: 9999, display: 'flex',
+      alignItems: 'center', justifyContent: 'center',
     }}>
-      <div style={{ 
-        backgroundColor: '#ffffff', 
-        borderRadius: '12px', 
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)', 
-        maxWidth: '1400px', 
-        width: '100%', 
-        maxHeight: '90vh', 
-        overflow: 'auto',
-        position: 'relative'
+      <div style={{
+        backgroundColor: '#ffffff', borderRadius: '12px',
+        padding: '48px', textAlign: 'center', maxWidth: '400px',
       }}>
-        {/* Loading Overlay */}
-        {isGenerating && (
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            zIndex: 10,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '32px',
-            borderRadius: '12px'
-          }}>
-            <div style={{ 
-              width: '64px', 
-              height: '64px', 
-              border: '4px solid #E5E7EB',
-              borderTop: '4px solid #2563EB',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
-              marginBottom: '24px'
-            }} />
-            <h3 style={{ 
-              fontSize: '20px', 
-              fontWeight: 'bold', 
-              color: '#1f2937', 
-              marginBottom: '12px' 
-            }}>
-              Generating PDF Report
-            </h3>
-            <p style={{ 
-              fontSize: '14px', 
-              color: '#6b7280', 
-              marginBottom: '24px',
-              textAlign: 'center'
-            }}>
-              {statusMessage}
-            </p>
-            <div style={{
-              width: '100%',
-              maxWidth: '400px',
-              height: '8px',
-              backgroundColor: '#E5E7EB',
-              borderRadius: '4px',
-              overflow: 'hidden'
-            }}>
-              <div style={{
-                width: `${progress}%`,
-                height: '100%',
-                backgroundColor: '#2563EB',
-                transition: 'width 0.3s ease',
-                borderRadius: '4px'
-              }} />
-            </div>
-            <p style={{ 
-              fontSize: '12px', 
-              color: '#9ca3af', 
-              marginTop: '8px'
-            }}>
-              {progress}%
-            </p>
-            <style>{`
-              @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-              }
-            `}</style>
-          </div>
+        <div style={{
+          width: '64px', height: '64px',
+          border: '4px solid #E5E7EB',
+          borderTop: `4px solid ${loading ? '#2563EB' : '#10b981'}`,
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite',
+          margin: '0 auto 24px',
+        }} />
+        <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1f2937', marginBottom: '8px' }}>
+          {loading ? 'Mengambil Data' : 'Generating PDF'}
+        </h3>
+        <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
+          {loading ? 'Memuat data dari database...' : 'Membuat laporan PDF...'}
+        </p>
+        {!loading && (
+          <p style={{ fontSize: '12px', color: '#9ca3af' }}>Download akan dimulai otomatis</p>
         )}
-        
-        <div style={{ padding: '32px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>
-              Preview Laporan Analitik
-            </h2>
-            <button
-              onClick={onClose}
-              style={{ 
-                color: '#6b7280', 
-                fontSize: '28px', 
-                fontWeight: 'bold', 
-                border: 'none', 
-                background: 'none', 
-                cursor: 'pointer',
-                padding: '4px 8px',
-                lineHeight: 1
-              }}
-            >
-              ×
-            </button>
-          </div>
-          
-          {/* Multi-page Layout Container */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            
-            {/* PAGE 1: Top 10 Urusan + Jenis Inovasi Charts */}
-            <div id="report-analytics-page-1" style={{ 
-              backgroundColor: '#ffffff', 
-              padding: '24px',
-              width: '1122px', // A4 landscape width at 96 DPI (297mm)
-              height: '793px', // A4 landscape height at 96 DPI (210mm)
-              margin: '0 auto',
-              boxSizing: 'border-box',
-              overflow: 'hidden',
-              position: 'relative',
-              border: '1px solid #e5e7eb'
-            }}>
-              {/* Header */}
-              <div style={{ 
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '14px', 
-                borderBottom: '3px solid #2563EB', 
-                paddingBottom: '12px' 
-              }}>
-                <img src={logo} alt="BRIDA Jatim" style={{ height: '45px' }} />
-                <div style={{ flex: 1, marginLeft: '20px' }}>
-                  <h1 style={{ fontSize: '22px', fontWeight: 'bold', color: '#1f2937', margin: '0 0 4px 0' }}>
-                    Laporan Analitik Inovasi BRIDA Jawa Timur
-                  </h1>
-                  <p style={{ fontSize: '11px', color: '#6b7280', margin: 0 }}>
-                    Tanggal Generate: {new Date().toLocaleDateString('id-ID', { 
-                      day: 'numeric', 
-                      month: 'long', 
-                      year: 'numeric' 
-                    })} | Halaman 1 dari 2
-                  </p>
-                </div>
-              </div>
-
-              {/* Filter Info */}
-              <div style={{ marginBottom: '14px', backgroundColor: '#f0f9ff', padding: '10px 14px', borderRadius: '6px', border: '2px solid #2563EB' }}>
-                <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '10px', color: '#6b7280' }}>Periode:</span>
-                    <span style={{ fontSize: '11px', color: '#1f2937', fontWeight: 'bold' }}>Semua Tahun</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '10px', color: '#6b7280' }}>Kategori:</span>
-                    <span style={{ fontSize: '11px', color: '#1f2937', fontWeight: 'bold' }}>Top 10 Urusan</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '10px', color: '#6b7280' }}>Total:</span>
-                    <span style={{ fontSize: '11px', color: '#1f2937', fontWeight: 'bold' }}>{totalInnovations} Inovasi</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Chart 1: Top 10 Urusan */}
-              <div style={{ marginBottom: '14px' }}>
-                <div style={{ 
-                  padding: '14px', 
-                  backgroundColor: '#f9fafb', 
-                  borderRadius: '8px',
-                  height: '330px'
-                }}>
-                  <h3 style={{ fontSize: '13px', fontWeight: 'bold', color: '#1f2937', marginBottom: '10px', margin: '0 0 10px 0' }}>
-                    Top 10 Urusan Berdasarkan Tahapan Inovasi
-                  </h3>
-                  <div style={{ width: '100%', height: '280px', minWidth: '1074px', minHeight: '280px' }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart 
-                        data={urusanTahapanData} 
-                        margin={{ top: 10, right: 20, left: 10, bottom: 50 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                        <XAxis 
-                          dataKey="urusan" 
-                          stroke="#6b7280" 
-                          angle={-45}
-                          textAnchor="end"
-                          height={70}
-                          interval={0}
-                          style={{ fontSize: '9px', fontWeight: '600' }}
-                        />
-                        <YAxis 
-                          stroke="#6b7280" 
-                          style={{ fontSize: '10px', fontWeight: '600' }}
-                        />
-                        <Tooltip 
-                          contentStyle={{
-                            backgroundColor: '#ffffff',
-                            border: '1px solid #e5e7eb',
-                            borderRadius: '4px',
-                            fontSize: '10px'
-                          }}
-                        />
-                        <Legend 
-                          verticalAlign="top" 
-                          height={28}
-                          wrapperStyle={{ fontSize: '10px', fontWeight: '600' }}
-                        />
-                        <Bar dataKey="inisiatif" stackId="a" fill="#f59e0b" name="Inisiatif" radius={[0, 0, 0, 0]} />
-                        <Bar dataKey="ujiCoba" stackId="a" fill="#3b82f6" name="Uji Coba" radius={[0, 0, 0, 0]} />
-                        <Bar dataKey="penerapan" stackId="a" fill="#10b981" name="Penerapan" radius={[6, 6, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              </div>
-
-              {/* Chart 2: Jenis Inovasi with Summary Cards */}
-              <div style={{ marginBottom: '14px' }}>
-                <div style={{ 
-                  padding: '14px', 
-                  backgroundColor: '#f9fafb', 
-                  borderRadius: '8px',
-                  height: '300px'
-                }}>
-                  <h3 style={{ fontSize: '13px', fontWeight: 'bold', color: '#1f2937', marginBottom: '10px', margin: '0 0 10px 0' }}>
-                    Distribusi Jenis Inovasi
-                  </h3>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                    {/* Pie Chart */}
-                    <div style={{ width: '350px', height: '240px', minWidth: '350px', minHeight: '240px' }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={jenisInovasiData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={55}
-                            outerRadius={85}
-                            paddingAngle={3}
-                            dataKey="value"
-                          >
-                            {jenisInovasiData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip 
-                            contentStyle={{
-                              backgroundColor: '#ffffff',
-                              border: '1px solid #e5e7eb',
-                              borderRadius: '4px',
-                              fontSize: '10px'
-                            }}
-                          />
-                          <Legend 
-                            verticalAlign="bottom" 
-                            height={40}
-                            wrapperStyle={{ fontSize: '10px', fontWeight: '600' }}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    
-                    {/* Summary Cards */}
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {jenisInovasiData.map((item, index) => (
-                        <div key={index} style={{ 
-                          padding: '14px', 
-                          backgroundColor: '#ffffff', 
-                          borderRadius: '6px',
-                          border: `3px solid ${item.color}`,
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center'
-                        }}>
-                          <div>
-                            <p style={{ fontSize: '11px', color: '#6b7280', margin: '0 0 4px 0' }}>
-                              {item.name}
-                            </p>
-                            <p style={{ fontSize: '28px', fontWeight: 'bold', color: item.color, margin: 0 }}>
-                              {item.value}
-                            </p>
-                          </div>
-                          <div style={{ textAlign: 'right' }}>
-                            <p style={{ fontSize: '24px', fontWeight: 'bold', color: item.color, margin: 0 }}>
-                              {((item.value / totalInnovations) * 100).toFixed(1)}%
-                            </p>
-                            <p style={{ fontSize: '9px', color: '#9ca3af', margin: '4px 0 0 0' }}>
-                              dari total
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div style={{ 
-                position: 'absolute',
-                bottom: '24px',
-                left: '24px',
-                right: '24px',
-                paddingTop: '10px', 
-                borderTop: '2px solid #e5e7eb', 
-                textAlign: 'center' 
-              }}>
-                <p style={{ fontSize: '10px', fontWeight: 'bold', color: '#1f2937', marginBottom: '4px', margin: 0 }}>
-                  BADAN RISET DAN INOVASI DAERAH PROVINSI JAWA TIMUR
-                </p>
-                <p style={{ fontSize: '8px', color: '#6b7280', margin: '4px 0 0 0', lineHeight: '1.4' }}>
-                  Jl. Ahmad Yani No. 152, Surabaya | Email: brida@jatimprov.go.id | Website: brida.jatimprov.go.id
-                </p>
-              </div>
-            </div>
-
-            {/* PAGE 2: Bentuk Inovasi + Watchlist */}
-            <div id="report-analytics-page-2" style={{ 
-              backgroundColor: '#ffffff', 
-              padding: '24px',
-              width: '1122px',
-              height: '793px',
-              margin: '0 auto',
-              boxSizing: 'border-box',
-              overflow: 'hidden',
-              position: 'relative',
-              border: '1px solid #e5e7eb'
-            }}>
-              {/* Header */}
-              <div style={{ 
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '14px', 
-                borderBottom: '3px solid #2563EB', 
-                paddingBottom: '12px' 
-              }}>
-                <img src={logo} alt="BRIDA Jatim" style={{ height: '45px' }} />
-                <div style={{ flex: 1, marginLeft: '20px' }}>
-                  <h1 style={{ fontSize: '22px', fontWeight: 'bold', color: '#1f2937', margin: '0 0 4px 0' }}>
-                    Laporan Analitik Inovasi BRIDA Jawa Timur
-                  </h1>
-                  <p style={{ fontSize: '11px', color: '#6b7280', margin: 0 }}>
-                    Tanggal Generate: {new Date().toLocaleDateString('id-ID', { 
-                      day: 'numeric', 
-                      month: 'long', 
-                      year: 'numeric' 
-                    })} | Halaman 2 dari 2
-                  </p>
-                </div>
-              </div>
-
-              {/* Chart 3: Bentuk Inovasi Per Inisiator */}
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ 
-                  padding: '14px', 
-                  backgroundColor: '#f9fafb', 
-                  borderRadius: '8px',
-                  height: '310px'
-                }}>
-                  <h3 style={{ fontSize: '13px', fontWeight: 'bold', color: '#1f2937', marginBottom: '10px', margin: '0 0 10px 0' }}>
-                    Bentuk Inovasi Per Inisiator
-                  </h3>
-                  <div style={{ width: '100%', height: '260px', minWidth: '1074px', minHeight: '260px' }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart 
-                        data={bentukInovasiPerInisiatorData} 
-                        margin={{ top: 10, right: 20, left: 10, bottom: 45 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                        <XAxis 
-                          dataKey="inisiator" 
-                          stroke="#6b7280" 
-                          angle={-45}
-                          textAnchor="end"
-                          height={60}
-                          interval={0}
-                          style={{ fontSize: '10px', fontWeight: '600' }}
-                        />
-                        <YAxis 
-                          stroke="#6b7280" 
-                          style={{ fontSize: '10px', fontWeight: '600' }}
-                        />
-                        <Tooltip 
-                          contentStyle={{
-                            backgroundColor: '#ffffff',
-                            border: '1px solid #e5e7eb',
-                            borderRadius: '4px',
-                            fontSize: '10px'
-                          }}
-                        />
-                        <Legend 
-                          verticalAlign="top" 
-                          height={28}
-                          wrapperStyle={{ fontSize: '10px', fontWeight: '600' }}
-                        />
-                        <Bar dataKey="aplikasi" stackId="a" fill="#f59e0b" name="Aplikasi" radius={[0, 0, 0, 0]} />
-                        <Bar dataKey="sop" stackId="a" fill="#3b82f6" name="SOP" radius={[0, 0, 0, 0]} />
-                        <Bar dataKey="metode" stackId="a" fill="#10b981" name="Metode" radius={[6, 6, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              </div>
-
-              {/* Watchlist Table */}
-              <div style={{ marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '12px', fontWeight: 'bold', color: '#1f2937', marginBottom: '10px', borderLeft: '3px solid #ef4444', paddingLeft: '8px' }}>
-                  ⚠️ Watchlist: Inovasi Perlu Perhatian
-                </h3>
-                <div style={{ padding: '12px', backgroundColor: '#fef2f2', borderRadius: '6px', border: '2px solid #ef4444' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
-                        <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: '10px', fontWeight: 'bold', color: '#1f2937' }}>
-                          Nama Inovasi
-                        </th>
-                        <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: '10px', fontWeight: 'bold', color: '#1f2937' }}>
-                          Inisiator
-                        </th>
-                        <th style={{ padding: '8px 10px', textAlign: 'center', fontSize: '10px', fontWeight: 'bold', color: '#1f2937' }}>
-                          Tahun
-                        </th>
-                        <th style={{ padding: '8px 10px', textAlign: 'center', fontSize: '10px', fontWeight: 'bold', color: '#1f2937' }}>
-                          Skor
-                        </th>
-                        <th style={{ padding: '8px 10px', textAlign: 'center', fontSize: '10px', fontWeight: 'bold', color: '#1f2937' }}>
-                          Status
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {watchlistData.map((item, index) => {
-                        const badge = getMaturityBadge(item.skorKematangan);
-                        return (
-                          <tr key={index} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                            <td style={{ padding: '8px 10px', fontSize: '9px', color: '#374151', fontWeight: '600' }}>
-                              {item.nama}
-                            </td>
-                            <td style={{ padding: '8px 10px', fontSize: '9px', color: '#6b7280' }}>
-                              {item.inisiator}
-                            </td>
-                            <td style={{ padding: '8px 10px', textAlign: 'center', fontSize: '9px', color: '#6b7280' }}>
-                              {item.tahunPenerapan}
-                            </td>
-                            <td style={{ padding: '8px 10px', textAlign: 'center', fontSize: '11px', fontWeight: 'bold', color: '#1f2937' }}>
-                              {item.skorKematangan}
-                            </td>
-                            <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                              <span style={{ 
-                                backgroundColor: badge.color, 
-                                color: badge.textColor, 
-                                padding: '4px 10px', 
-                                borderRadius: '12px',
-                                fontSize: '8px',
-                                fontWeight: 'bold',
-                                display: 'inline-block'
-                              }}>
-                                {badge.label}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Key Insights */}
-              <div style={{ marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '12px', fontWeight: 'bold', color: '#1f2937', marginBottom: '8px', borderLeft: '3px solid #2563EB', paddingLeft: '8px' }}>
-                  Rekomendasi Tindakan
-                </h3>
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(2, 1fr)', 
-                  gap: '8px',
-                }}>
-                  <div style={{ 
-                    padding: '10px', 
-                    backgroundColor: '#f0f9ff', 
-                    borderRadius: '4px',
-                    borderLeft: '3px solid #2563EB'
-                  }}>
-                    <p style={{ fontSize: '9px', color: '#1f2937', margin: 0, lineHeight: '1.5', fontWeight: '600' }}>
-                      💡 Prioritaskan peningkatan skor kematangan pada 5 inovasi watchlist
-                    </p>
-                  </div>
-                  <div style={{ 
-                    padding: '10px', 
-                    backgroundColor: '#f0fdf4', 
-                    borderRadius: '4px',
-                    borderLeft: '3px solid #10b981'
-                  }}>
-                    <p style={{ fontSize: '9px', color: '#1f2937', margin: 0, lineHeight: '1.5', fontWeight: '600' }}>
-                      📊 Tingkatkan kolaborasi antar urusan untuk knowledge sharing
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div style={{ 
-                position: 'absolute',
-                bottom: '24px',
-                left: '24px',
-                right: '24px',
-                paddingTop: '10px', 
-                borderTop: '2px solid #e5e7eb', 
-                textAlign: 'center' 
-              }}>
-                <p style={{ fontSize: '10px', fontWeight: 'bold', color: '#1f2937', marginBottom: '4px', margin: 0 }}>
-                  BADAN RISET DAN INOVASI DAERAH PROVINSI JAWA TIMUR
-                </p>
-                <p style={{ fontSize: '8px', color: '#6b7280', margin: '4px 0 0 0', lineHeight: '1.4' }}>
-                  Jl. Ahmad Yani No. 152, Surabaya | Email: brida@jatimprov.go.id | Website: brida.jatimprov.go.id
-                </p>
-              </div>
-            </div>
-
-          </div>
-        </div>
+        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
       </div>
     </div>
   );

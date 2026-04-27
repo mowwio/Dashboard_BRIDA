@@ -1,464 +1,348 @@
 import { useEffect, useState } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import logo from 'figma:asset/3554ecab8b87e1a4e26b58997b7d2614ae189b80.png';
+import logo from '/images/logo-brida-jatim.png';
 
-interface ReportSingleInnovationProps {
+interface ReportCollaborationProps {
   onClose: () => void;
-  innovation: {
-    id: string;
-    title: string;
-    jenis: string;
-    score: number;
-    category: string;
-    summary: string;
-    description?: string;
-    collaborators?: string[];
-    benefits?: string[];
-    challenges?: string[];
-    recommendations?: string[];
+  data: {
+    inovasi_1: { judul: string; opd: string; urusan?: string; tahap?: string; tanggal_penerapan?: string; admin?: string; deskripsi?: string };
+    inovasi_2: { judul: string; opd: string; urusan?: string; tahap?: string; tanggal_penerapan?: string; admin?: string; deskripsi?: string };
+    skor_kecocokan: number;
+    kategori: string;
+    hasil_ai: {
+      judul_kolaborasi?: string;
+      tingkat_kolaborasi?: string;
+      manfaat: string[];
+      alasan: string[];
+      dampak: string[];
+    };
   };
 }
 
-export function ReportSingleInnovation({ onClose, innovation }: ReportSingleInnovationProps) {
+function splitDeskripsiToParagraphs(text: string): string[] {
+  if (!text) return [];
+  const clean = text.replace(/\n+/g, ' ').trim();
+  const sentences = clean.match(/[^.!?]+[.!?]+/g) ?? [clean];
+  const paragraphs: string[] = [];
+  for (let i = 0; i < sentences.length; i += 3) {
+    paragraphs.push(sentences.slice(i, i + 3).map(s => s.trim()).join(' '));
+  }
+  return paragraphs;
+}
+
+export default function ReportCollaboration({ onClose, data }: ReportCollaborationProps) {
   const [isGenerating, setIsGenerating] = useState(true);
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState('Memuat komponen...');
 
-  const getScoreBadgeColor = (score: number) => {
-    if (score >= 90) return { bg: '#16A34A', text: '#ffffff' };
-    if (score >= 70) return { bg: '#3b82f6', text: '#ffffff' };
-    return { bg: '#f59e0b', text: '#ffffff' };
+  const getScoreColor = (score: number) => {
+    if (score >= 90) return '#16A34A';
+    if (score >= 70) return '#3b82f6';
+    return '#f59e0b';
+  };
+  const scoreColor = getScoreColor(data.skor_kecocokan);
+
+  const formatTanggal = (raw?: string) => {
+    if (!raw) return '-';
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return raw;
+    return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
   };
 
-  const scoreColor = getScoreBadgeColor(innovation.score);
+  const Footer = () => (
+    <div style={{ paddingTop: '14px', borderTop: '2px solid #e5e7eb', textAlign: 'center' }}>
+      <p style={{ fontSize: '13px', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>
+        BADAN RISET DAN INOVASI DAERAH PROVINSI JAWA TIMUR
+      </p>
+      <p style={{ fontSize: '11px', color: '#6b7280', margin: '4px 0 0 0', lineHeight: '1.6' }}>
+        Jl. Gayung Kebonsari No.56, Gayungan, Kec. Gayungan Surabaya, Jawa Timur 60235
+        <br />Email: balitbangjatim@gmail.com | Website: brida.jatimprov.go.id/
+      </p>
+    </div>
+  );
+
+  const htmlOpts = {
+    scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false,
+    onclone: (clonedDoc: Document) => {
+      clonedDoc.querySelectorAll('*').forEach((el) => {
+        const style = clonedDoc.defaultView?.getComputedStyle(el);
+        if (!style) return;
+        ['color', 'backgroundColor', 'borderColor', 'boxShadow'].forEach((prop) => {
+          if (style.getPropertyValue(prop).includes('oklch'))
+            (el as HTMLElement).style.setProperty(prop, '#000000');
+        });
+      });
+    },
+  };
 
   useEffect(() => {
     const generatePDF = async () => {
       try {
         setIsGenerating(true);
-        setProgress(10);
-        setStatusMessage('Menunggu render komponen...');
-        
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        setProgress(40);
-        setStatusMessage('Memverifikasi elemen visual...');
-        
-        const reportContent = document.getElementById('report-single-innovation-content');
-        if (!reportContent) {
-          console.error('Report content not found');
-          alert('Error: Konten laporan tidak ditemukan. Silakan coba lagi.');
-          onClose();
-          return;
-        }
-        
-        const rect = reportContent.getBoundingClientRect();
-        if (rect.width === 0 || rect.height === 0) {
-          console.error('Report content has invalid dimensions:', rect);
-          alert('Error: Konten laporan memiliki dimensi tidak valid. Silakan coba lagi.');
-          onClose();
-          return;
-        }
-        
-        setProgress(60);
-        setStatusMessage('Membuat screenshot halaman...');
-        
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        const styleElement = document.createElement('style');
-        styleElement.id = 'html2canvas-oklch-fix';
-        styleElement.textContent = `
-          #report-single-innovation-content,
-          #report-single-innovation-content * {
-            color: inherit !important;
-            background-color: inherit !important;
-            border-color: inherit !important;
-          }
-          #report-single-innovation-content {
-            color: #000000 !important;
-            background-color: #ffffff !important;
-          }
-        `;
-        document.head.appendChild(styleElement);
-        
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        const canvas = await html2canvas(reportContent, {
-          scale: 2.5,
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: '#ffffff',
-          logging: false,
-          windowWidth: reportContent.scrollWidth,
-          windowHeight: reportContent.scrollHeight,
-        });
-        
-        const tempStyle = document.getElementById('html2canvas-oklch-fix');
-        if (tempStyle) {
-          tempStyle.remove();
-        }
-        
-        setProgress(85);
-        setStatusMessage('Mengkonversi ke PDF...');
-        
-        const imgData = canvas.toDataURL('image/png', 1.0);
-        
-        const pdf = new jsPDF({
-          orientation: 'portrait',
-          unit: 'mm',
-          format: 'a4'
-        });
-        
+        setProgress(10); setStatusMessage('Menunggu render komponen...');
+        await new Promise(r => setTimeout(r, 800));
+        setProgress(40); setStatusMessage('Memverifikasi elemen visual...');
+
+        const page1 = document.getElementById('pdf-page-1');
+        const page2 = document.getElementById('pdf-page-2');
+        if (!page1 || !page2) { alert('Error: Konten laporan tidak ditemukan.'); onClose(); return; }
+
+        setProgress(60); setStatusMessage('Membuat screenshot halaman...');
+        await document.fonts.ready;
+        await new Promise(r => setTimeout(r, 300));
+
+        const pdf = new jsPDF('p', 'mm', 'a4');
         const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        const canvasAspect = canvas.height / canvas.width;
-        
-        const contentWidth = pdfWidth - 20;
-        const contentHeight = contentWidth * canvasAspect;
-        const pageHeight = pdfHeight - 20;
-        
-        const totalPages = Math.ceil(contentHeight / pageHeight);
-        
-        for (let page = 0; page < totalPages; page++) {
-          if (page > 0) {
-            pdf.addPage();
-          }
-          
-          const position = -page * pageHeight;
-          
-          pdf.addImage(
-            imgData,
-            'PNG',
-            10,
-            position + 10,
-            contentWidth,
-            contentHeight,
-            undefined,
-            'FAST'
-          );
-        }
-        
-        setProgress(95);
-        setStatusMessage('Menyimpan file...');
-        
-        const sanitizedTitle = innovation.title.replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 50);
-        const fileName = `BRIDA_Inovasi_${sanitizedTitle}_${new Date().toISOString().split('T')[0]}.pdf`;
-        pdf.save(fileName);
-        
-        setProgress(100);
-        setStatusMessage('Selesai!');
-        
-        setTimeout(() => {
-          onClose();
-        }, 500);
-        
-      } catch (error) {
-        console.error('Error generating PDF:', error);
+        const margin = 15;
+        const imgWidth = pdfWidth - margin * 2;
+
+        const canvas1 = await html2canvas(page1, { ...htmlOpts, windowWidth: page1.scrollWidth, windowHeight: page1.scrollHeight });
+        pdf.addImage(canvas1.toDataURL('image/png'), 'PNG', margin, margin, imgWidth, (canvas1.height * imgWidth) / canvas1.width);
+
+        setProgress(80); setStatusMessage('Membuat halaman kedua...');
+        pdf.addPage();
+        const canvas2 = await html2canvas(page2, { ...htmlOpts, windowWidth: page2.scrollWidth, windowHeight: page2.scrollHeight });
+        pdf.addImage(canvas2.toDataURL('image/png'), 'PNG', margin, margin, imgWidth, (canvas2.height * imgWidth) / canvas2.width);
+
+        setProgress(95); setStatusMessage('Menyimpan file...');
+        const t1 = data.inovasi_1.judul.replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 25);
+        const t2 = data.inovasi_2.judul.replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 25);
+        pdf.save(`BRIDA_Kolaborasi_${t1}_${t2}_${new Date().toISOString().split('T')[0]}.pdf`);
+
+        setProgress(100); setStatusMessage('Selesai!');
+        setTimeout(() => onClose(), 500);
+      } catch (e) {
+        console.error('Error generating PDF:', e);
         alert('Terjadi kesalahan saat membuat PDF. Silakan coba lagi.');
         onClose();
-      } finally {
-        setIsGenerating(false);
-      }
+      } finally { setIsGenerating(false); }
     };
-    
-    const timer = setTimeout(() => {
-      generatePDF();
-    }, 300);
-    
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [onClose, innovation.title]);
+    const timer = setTimeout(() => generatePDF(), 300);
+    return () => clearTimeout(timer);
+  }, [onClose, data]);
+
+  const pageStyle: React.CSSProperties = {
+    backgroundColor: '#ffffff', padding: '28px',
+    minHeight: '1050px', maxHeight: '1050px',
+    display: 'flex', flexDirection: 'column',
+    maxWidth: '794px', width: '100%', margin: '0 auto',
+    boxSizing: 'border-box',
+  };
+
+  const desc1 = splitDeskripsiToParagraphs(data.inovasi_1.deskripsi ?? '');
+  const desc2 = splitDeskripsiToParagraphs(data.inovasi_2.deskripsi ?? '');
 
   return (
-    <div style={{ 
-      position: 'fixed', 
-      inset: 0, 
-      backgroundColor: 'rgba(17, 24, 39, 0.75)', 
-      zIndex: 9999, 
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center', 
-      padding: '16px' 
+    <div style={{
+      position: 'fixed', inset: 0, backgroundColor: 'rgba(17,24,39,0.75)',
+      zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
     }}>
-      <div style={{ 
-        backgroundColor: '#ffffff', 
-        borderRadius: '12px', 
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)', 
-        maxWidth: '1400px', 
-        width: '100%', 
-        maxHeight: '90vh', 
-        overflow: 'auto',
-        position: 'relative'
+      <div style={{
+        backgroundColor: '#ffffff', borderRadius: '12px',
+        boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)',
+        maxWidth: '1400px', width: '100%', maxHeight: '90vh',
+        overflow: 'auto', position: 'relative',
       }}>
-        {/* Loading Overlay */}
         {isGenerating && (
           <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-            zIndex: 10,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '32px',
-            borderRadius: '12px'
+            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(255,255,255,0.95)', zIndex: 10,
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            justifyContent: 'center', padding: '32px', borderRadius: '12px',
           }}>
-            <div style={{ 
-              width: '64px', 
-              height: '64px', 
-              border: '4px solid #E5E7EB',
-              borderTop: '4px solid #2563EB',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
-              marginBottom: '24px'
-            }} />
-            <h3 style={{ 
-              fontSize: '20px', 
-              fontWeight: 'bold', 
-              color: '#1f2937', 
-              marginBottom: '12px' 
-            }}>
-              Generating PDF Report
-            </h3>
-            <p style={{ 
-              fontSize: '14px', 
-              color: '#6b7280', 
-              marginBottom: '24px',
-              textAlign: 'center'
-            }}>
-              {statusMessage}
-            </p>
-            <div style={{
-              width: '100%',
-              maxWidth: '400px',
-              height: '8px',
-              backgroundColor: '#E5E7EB',
-              borderRadius: '4px',
-              overflow: 'hidden'
-            }}>
-              <div style={{
-                width: `${progress}%`,
-                height: '100%',
-                backgroundColor: '#2563EB',
-                transition: 'width 0.3s ease',
-                borderRadius: '4px'
-              }} />
+            <div style={{ width: '60px', height: '60px', border: '4px solid #E5E7EB', borderTop: '4px solid #2563EB', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: '20px' }} />
+            <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1f2937', marginBottom: '10px' }}>Generating PDF Report</h3>
+            <p style={{ fontSize: '13px', color: '#6b7280', textAlign: 'center', marginBottom: '14px' }}>{statusMessage}</p>
+            <div style={{ width: '100%', maxWidth: '400px', height: '8px', backgroundColor: '#E5E7EB', borderRadius: '4px', overflow: 'hidden', marginBottom: '6px' }}>
+              <div style={{ width: `${progress}%`, height: '100%', backgroundColor: '#2563EB', transition: 'width 0.3s ease', borderRadius: '4px' }} />
             </div>
-            <p style={{ 
-              fontSize: '12px', 
-              color: '#9ca3af', 
-              marginTop: '8px'
-            }}>
-              {progress}%
-            </p>
-            <style>{`
-              @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-              }
-            `}</style>
+            <p style={{ fontSize: '12px', color: '#9ca3af' }}>{progress}%</p>
+            <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
           </div>
         )}
-        
-        <div style={{ padding: '32px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>
-              Preview Laporan Inovasi
-            </h2>
-            <button
-              onClick={onClose}
-              style={{ 
-                color: '#6b7280', 
-                fontSize: '28px', 
-                fontWeight: 'bold', 
-                border: 'none', 
-                background: 'none', 
-                cursor: 'pointer',
-                padding: '4px 8px',
-                lineHeight: 1
-              }}
-            >
-              ×
-            </button>
+
+        <div style={{ padding: '28px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+            <h2 style={{ fontSize: '22px', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>Preview Laporan Inovasi</h2>
+            <button onClick={onClose} style={{ color: '#6b7280', fontSize: '26px', fontWeight: 'bold', border: 'none', background: 'none', cursor: 'pointer', padding: '4px 8px', lineHeight: 1 }}>×</button>
           </div>
-          
-          {/* Report Content */}
-          <div id="report-single-innovation-content" style={{ 
-            backgroundColor: '#ffffff', 
-            padding: '28px',
-            minHeight: '500px',
-            display: 'block',
-            visibility: 'visible',
-            width: '210mm',
-            margin: '0 auto',
-            boxSizing: 'border-box'
-          }}>
-            {/* Header */}
-            <div style={{ textAlign: 'center', marginBottom: '28px', borderBottom: '3px solid #2563EB', paddingBottom: '16px' }}>
-              <img src={logo} alt="BRIDA Jatim" style={{ height: '60px', margin: '0 auto 16px', display: 'block' }} />
-              <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1f2937', marginBottom: '8px', margin: 0 }}>
-                Laporan Detail Inovasi
-              </h1>
-              <h2 style={{ fontSize: '20px', color: '#4b5563', marginBottom: '8px', margin: '8px 0' }}>
-                BRIDA Jawa Timur
-              </h2>
-              <p style={{ fontSize: '14px', color: '#6b7280', margin: '8px 0' }}>
-                Tanggal Generate: {new Date().toLocaleDateString('id-ID', { 
-                  day: 'numeric', 
-                  month: 'long', 
-                  year: 'numeric' 
-                })}
-              </p>
-            </div>
 
-            {/* Innovation Title & Score */}
-            <div style={{ marginBottom: '24px', backgroundColor: '#f0f9ff', padding: '24px', borderRadius: '10px', border: '3px solid #2563EB', pageBreakInside: 'avoid' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px' }}>
-                <div style={{ flex: 1 }}>
-                  <h3 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1f2937', marginBottom: '10px', margin: '0 0 10px 0' }}>
-                    {innovation.title}
-                  </h3>
-                  <span style={{ 
-                    display: 'inline-block',
-                    padding: '6px 12px', 
-                    backgroundColor: '#e5e7eb', 
-                    color: '#1f2937', 
-                    borderRadius: '16px',
-                    fontSize: '12px',
-                    fontWeight: 'bold'
-                  }}>
-                    {innovation.jenis}
-                  </span>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ 
-                    backgroundColor: scoreColor.bg, 
-                    color: scoreColor.text, 
-                    padding: '12px 18px', 
-                    borderRadius: '10px',
-                    fontSize: '28px',
-                    fontWeight: 'bold',
-                    marginBottom: '6px'
-                  }}>
-                    {innovation.score}%
-                  </div>
-                  <div style={{ 
-                    fontSize: '12px', 
-                    fontWeight: 'bold',
-                    color: scoreColor.bg
-                  }}>
-                    {innovation.category}
-                  </div>
-                </div>
+          {/* ════ PAGE 1 ════ */}
+          <div id="pdf-page-1" style={{ ...pageStyle, marginBottom: '30px' }}>
+
+            {/*
+              HEADER 3 KOLOM:
+              Kiri: Tanggal Dibuat
+              Tengah: Logo + Judul (teks di bawah logo)
+              Kanan: Skor Kecocokan (teks angka, tanpa kotak berwarna)
+            */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: '16px',
+              marginBottom: '20px',
+              paddingBottom: '16px',
+              borderBottom: '3px solid #2563EB',
+            }}>
+              {/* Kiri — Tanggal */}
+              <div style={{ minWidth: '110px', paddingTop: '6px' }}>
+                <p style={{ fontSize: '9px', color: '#6b7280', margin: '0 0 4px 0', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  Tanggal Dibuat
+                </p>
+                <p style={{ fontSize: '13px', color: '#1f2937', margin: 0, fontWeight: 'bold' }}>
+                  {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </p>
               </div>
-            </div>
 
-            {/* Summary */}
-            <div style={{ marginBottom: '24px', pageBreakInside: 'avoid' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1f2937', marginBottom: '12px', borderLeft: '4px solid #2563EB', paddingLeft: '10px' }}>
-                Ringkasan
-              </h3>
-              <div style={{ padding: '20px', backgroundColor: '#f9fafb', borderRadius: '10px' }}>
-                <p style={{ fontSize: '14px', color: '#374151', lineHeight: '1.7', margin: 0 }}>
-                  {innovation.summary}
+              {/* Tengah — Logo + Judul */}
+              <div style={{ flex: 1, textAlign: 'center' }}>
+                <img src={logo} alt="BRIDA Jatim"
+                  style={{ height: '52px', display: 'block', margin: '0 auto 6px', objectFit: 'contain' }} />
+                <h1 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1f2937', margin: '0 0 2px 0', lineHeight: '1.2' }}>
+                  Laporan Analisis Potensi Kolaborasi Inovasi
+                </h1>
+              </div>
+
+              {/* Kanan — Skor (center, sama dengan ReportAIRecommendation) */}
+              <div style={{ minWidth: '110px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                <p style={{ fontSize: '9px', color: '#6b7280', margin: '0 0 4px 0', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  SKOR KECOCOKAN
+                </p>
+                <p style={{ fontSize: '26px', fontWeight: '900', color: scoreColor, margin: '0 0 2px 0', lineHeight: '1' }}>
+                  {data.skor_kecocokan}%
+                </p>
+                <p style={{ fontSize: '11px', color: scoreColor, margin: 0, fontWeight: '700' }}>
+                  {data.kategori}
                 </p>
               </div>
             </div>
 
-            {/* Description */}
-            {innovation.description && (
-              <div style={{ marginBottom: '24px', pageBreakInside: 'avoid' }}>
-                <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1f2937', marginBottom: '12px', borderLeft: '4px solid #2563EB', paddingLeft: '10px' }}>
-                  Deskripsi Detail
-                </h3>
-                <div style={{ padding: '20px', backgroundColor: '#f9fafb', borderRadius: '10px' }}>
-                  <p style={{ fontSize: '14px', color: '#374151', lineHeight: '1.7', margin: 0 }}>
-                    {innovation.description}
-                  </p>
+            {/* Detail Inovasi */}
+            <div style={{ marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 'bold', color: '#1f2937', margin: '0 0 12px 0', paddingLeft: '10px', borderLeft: '4px solid #2563EB' }}>
+                Detail Inovasi
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+
+                {/* Inovasi 1 */}
+                <div style={{ backgroundColor: '#EFF6FF', padding: '12px', borderRadius: '8px', border: '2px solid #3b82f6' }}>
+                  <p style={{ fontSize: '10px', color: '#6b7280', margin: '0 0 5px 0', fontWeight: '700', letterSpacing: '0.06em' }}>INOVASI 1</p>
+                  <h4 style={{ fontSize: '12px', fontWeight: 'bold', color: '#1f2937', margin: '0 0 7px 0', lineHeight: '1.4' }}>{data.inovasi_1.judul}</h4>
+                  <p style={{ fontSize: '10px', color: '#4b5563', margin: '0 0 3px 0' }}><strong>OPD:</strong> {data.inovasi_1.opd}</p>
+                  {data.inovasi_1.urusan && <p style={{ fontSize: '10px', color: '#4b5563', margin: '0 0 3px 0' }}><strong>Urusan:</strong> {data.inovasi_1.urusan}</p>}
+                  {data.inovasi_1.tahap && <p style={{ fontSize: '10px', color: '#4b5563', margin: '0 0 3px 0' }}><strong>Tahap:</strong> {data.inovasi_1.tahap}</p>}
+                  <p style={{ fontSize: '10px', color: '#4b5563', margin: '0 0 10px 0' }}><strong>Tgl. Penerapan:</strong> {formatTanggal(data.inovasi_1.tanggal_penerapan)}</p>
+                  {desc1.length > 0 && (
+                    <div style={{ backgroundColor: '#dbeafe', borderRadius: '6px', padding: '8px 10px', borderLeft: '3px solid #3b82f6' }}>
+                      <p style={{ fontSize: '10px', color: '#1e40af', margin: '0 0 5px 0', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Deskripsi</p>
+                      {desc1.map((para, i) => (
+                        <p key={i} style={{ fontSize: '10px', color: '#1f2937', margin: i < desc1.length - 1 ? '0 0 5px 0' : '0', lineHeight: '1.65', textAlign: 'justify' }}>{para}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Inovasi 2 */}
+                <div style={{ backgroundColor: '#F0FDF4', padding: '12px', borderRadius: '8px', border: '2px solid #16a34a' }}>
+                  <p style={{ fontSize: '10px', color: '#6b7280', margin: '0 0 5px 0', fontWeight: '700', letterSpacing: '0.06em' }}>INOVASI 2</p>
+                  <h4 style={{ fontSize: '12px', fontWeight: 'bold', color: '#1f2937', margin: '0 0 7px 0', lineHeight: '1.4' }}>{data.inovasi_2.judul}</h4>
+                  <p style={{ fontSize: '10px', color: '#4b5563', margin: '0 0 3px 0' }}><strong>OPD:</strong> {data.inovasi_2.opd}</p>
+                  {data.inovasi_2.urusan && <p style={{ fontSize: '10px', color: '#4b5563', margin: '0 0 3px 0' }}><strong>Urusan:</strong> {data.inovasi_2.urusan}</p>}
+                  {data.inovasi_2.tahap && <p style={{ fontSize: '10px', color: '#4b5563', margin: '0 0 3px 0' }}><strong>Tahap:</strong> {data.inovasi_2.tahap}</p>}
+                  <p style={{ fontSize: '10px', color: '#4b5563', margin: '0 0 10px 0' }}><strong>Tgl. Penerapan:</strong> {formatTanggal(data.inovasi_2.tanggal_penerapan)}</p>
+                  {desc2.length > 0 && (
+                    <div style={{ backgroundColor: '#bbf7d0', borderRadius: '6px', padding: '8px 10px', borderLeft: '3px solid #16a34a' }}>
+                      <p style={{ fontSize: '10px', color: '#166534', margin: '0 0 5px 0', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Deskripsi</p>
+                      {desc2.map((para, i) => (
+                        <p key={i} style={{ fontSize: '10px', color: '#1f2937', margin: i < desc2.length - 1 ? '0 0 5px 0' : '0', lineHeight: '1.65', textAlign: 'justify' }}>{para}</p>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
-
-            {/* Collaborators */}
-            {innovation.collaborators && innovation.collaborators.length > 0 && (
-              <div style={{ marginBottom: '24px', pageBreakInside: 'avoid' }}>
-                <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1f2937', marginBottom: '12px', borderLeft: '4px solid #2563EB', paddingLeft: '10px' }}>
-                  Kolaborator Potensial
-                </h3>
-                <div style={{ padding: '20px', backgroundColor: '#f9fafb', borderRadius: '10px' }}>
-                  <ul style={{ margin: 0, paddingLeft: '22px', fontSize: '14px', color: '#374151', lineHeight: '1.8' }}>
-                    {innovation.collaborators.map((collab, index) => (
-                      <li key={index} style={{ marginBottom: '8px' }}>{collab}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )}
-
-            {/* Benefits */}
-            {innovation.benefits && innovation.benefits.length > 0 && (
-              <div style={{ marginBottom: '24px', pageBreakInside: 'avoid' }}>
-                <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1f2937', marginBottom: '12px', borderLeft: '4px solid #16A34A', paddingLeft: '10px' }}>
-                  Manfaat Kolaborasi
-                </h3>
-                <div style={{ padding: '20px', backgroundColor: '#f0fdf4', borderRadius: '10px', border: '2px solid #16A34A' }}>
-                  <ul style={{ margin: 0, paddingLeft: '22px', fontSize: '14px', color: '#374151', lineHeight: '1.8' }}>
-                    {innovation.benefits.map((benefit, index) => (
-                      <li key={index} style={{ marginBottom: '8px' }}>{benefit}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )}
-
-            {/* Challenges */}
-            {innovation.challenges && innovation.challenges.length > 0 && (
-              <div style={{ marginBottom: '24px', pageBreakInside: 'avoid' }}>
-                <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1f2937', marginBottom: '12px', borderLeft: '4px solid #f59e0b', paddingLeft: '10px' }}>
-                  Tantangan & Pertimbangan
-                </h3>
-                <div style={{ padding: '20px', backgroundColor: '#fffbeb', borderRadius: '10px', border: '2px solid #f59e0b' }}>
-                  <ul style={{ margin: 0, paddingLeft: '22px', fontSize: '14px', color: '#374151', lineHeight: '1.8' }}>
-                    {innovation.challenges.map((challenge, index) => (
-                      <li key={index} style={{ marginBottom: '8px' }}>{challenge}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )}
-
-            {/* Recommendations */}
-            {innovation.recommendations && innovation.recommendations.length > 0 && (
-              <div style={{ marginBottom: '24px', pageBreakInside: 'avoid' }}>
-                <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1f2937', marginBottom: '12px', borderLeft: '4px solid #a855f7', paddingLeft: '10px' }}>
-                  Rekomendasi Tindak Lanjut
-                </h3>
-                <div style={{ padding: '20px', backgroundColor: '#faf5ff', borderRadius: '10px', border: '2px solid #a855f7' }}>
-                  <ul style={{ margin: 0, paddingLeft: '22px', fontSize: '14px', color: '#374151', lineHeight: '1.8' }}>
-                    {innovation.recommendations.map((rec, index) => (
-                      <li key={index} style={{ marginBottom: '8px' }}>{rec}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )}
-
-            {/* Footer */}
-            <div style={{ marginTop: '32px', paddingTop: '16px', borderTop: '2px solid #e5e7eb', textAlign: 'center' }}>
-              <p style={{ fontSize: '14px', fontWeight: 'bold', color: '#1f2937', marginBottom: '6px', margin: 0 }}>
-                BADAN RISET DAN INOVASI DAERAH PROVINSI JAWA TIMUR
-              </p>
-              <p style={{ fontSize: '12px', color: '#6b7280', margin: '6px 0 0 0', lineHeight: '1.6' }}>
-                Jl. Ahmad Yani No. 152, Surabaya | Email: brida@jatimprov.go.id | Website: brida.jatimprov.go.id
-              </p>
             </div>
+
+            <div style={{ marginTop: 'auto' }}><Footer /></div>
           </div>
+
+          {/* ════ PAGE 2 ════ */}
+          <div id="pdf-page-2" style={pageStyle}>
+
+            {/* Header page 2 */}
+            <div style={{ marginBottom: '16px', paddingBottom: '12px', borderBottom: '3px solid #e5e7eb' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1f2937', margin: 0 }}>Analisis Kolaborasi</h2>
+            </div>
+
+            {data.hasil_ai.judul_kolaborasi && (
+              <div style={{ marginBottom: '14px', backgroundColor: '#FAF5FF', padding: '12px 14px', borderRadius: '8px', border: '3px solid #9333EA' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: '#1f2937', margin: '0 0 5px 0', lineHeight: '1.4' }}>🤝 {data.hasil_ai.judul_kolaborasi}</h3>
+                {data.hasil_ai.tingkat_kolaborasi && (
+                  <p style={{ fontSize: '11px', color: '#6b7280', margin: 0, fontWeight: '600' }}>
+                    Tingkat Kolaborasi: <span style={{ color: '#9333EA', fontWeight: 'bold' }}>{data.hasil_ai.tingkat_kolaborasi}</span>
+                  </p>
+                )}
+              </div>
+            )}
+
+            {data.hasil_ai.manfaat?.length > 0 && (
+              <div style={{ marginBottom: '14px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: '#1f2937', margin: '0 0 10px 0', paddingLeft: '10px', borderLeft: '4px solid #16A34A' }}>✓ Manfaat Kolaborasi</h3>
+                <div style={{ backgroundColor: '#F0FDF4', padding: '10px 12px', borderRadius: '8px', border: '2px solid #16A34A' }}>
+                  {data.hasil_ai.manfaat.map((item, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: i < data.hasil_ai.manfaat.length - 1 ? '7px' : '0' }}>
+                      <span style={{ minWidth: '18px', fontWeight: 'bold', color: '#16A34A', fontSize: '12px', flexShrink: 0 }}>{i + 1}.</span>
+                      <span style={{ fontSize: '11px', lineHeight: '1.7', color: '#1f2937' }}>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {data.hasil_ai.alasan?.length > 0 && (
+              <div style={{ marginBottom: '14px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: '#1f2937', margin: '0 0 10px 0', paddingLeft: '10px', borderLeft: '4px solid #3B82F6' }}>🔗 Alasan Sinergi</h3>
+                <div style={{ backgroundColor: '#EFF6FF', padding: '10px 12px', borderRadius: '8px', border: '2px solid #3B82F6' }}>
+                  {data.hasil_ai.alasan.map((item, i) => (
+                    <p key={i} style={{ fontSize: '11px', color: '#374151', margin: i < data.hasil_ai.alasan.length - 1 ? '0 0 6px 0' : '0', lineHeight: '1.7' }}>{item}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {data.hasil_ai.dampak?.length > 0 && (
+              <div style={{ marginBottom: '14px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: '#1f2937', margin: '0 0 10px 0', paddingLeft: '10px', borderLeft: '4px solid #F59E0B' }}>📈 Potensi Dampak</h3>
+                <div style={{ backgroundColor: '#FFFBEB', padding: '10px 12px', borderRadius: '8px', border: '2px solid #F59E0B' }}>
+                  {data.hasil_ai.dampak.map((item, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: i < data.hasil_ai.dampak.length - 1 ? '7px' : '0' }}>
+                      <span style={{ minWidth: '18px', fontWeight: 'bold', color: '#F59E0B', fontSize: '12px', flexShrink: 0 }}>{i + 1}.</span>
+                      <span style={{ fontSize: '11px', lineHeight: '1.7', color: '#1f2937' }}>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div style={{ backgroundColor: '#ECFDF5', padding: '12px 14px', borderRadius: '8px', border: '3px solid #16A34A' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: 'bold', color: '#1f2937', margin: '0 0 10px 0' }}>💡 Langkah Selanjutnya</h3>
+              {[
+                'Koordinasikan pertemuan antara pihak-pihak terkait untuk membahas kolaborasi',
+                'Buat proposal kolaborasi dengan detail manfaat dan target capaian yang terukur',
+                'Susun timeline implementasi dan alokasi sumber daya',
+                'Monitor dan evaluasi progress kolaborasi secara berkala',
+              ].map((step, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: i < 3 ? '7px' : '0' }}>
+                  <span style={{ minWidth: '18px', fontWeight: 'bold', color: '#16A34A', fontSize: '12px', flexShrink: 0 }}>{i + 1}.</span>
+                  <span style={{ fontSize: '11px', lineHeight: '1.7', color: '#1f2937' }}>{step}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ marginTop: 'auto' }}><Footer /></div>
+          </div>
+
         </div>
       </div>
     </div>

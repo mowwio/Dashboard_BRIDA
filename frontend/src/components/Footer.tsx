@@ -1,5 +1,4 @@
-import { MapPin, Phone, Mail, Instagram, Twitter, ExternalLink } from 'lucide-react';
-import logo from 'figma:asset/762c03ce75379b8f11d45d27d5eb18d10fa7e492.png';
+import { MapPin, Phone, Mail, Instagram, Twitter } from 'lucide-react';
 
 interface FooterProps {
   darkMode: boolean;
@@ -8,86 +7,160 @@ interface FooterProps {
 
 export function Footer({ darkMode, sidebarOpen }: FooterProps) {
   return (
-    <footer className={`mt-auto transition-all duration-300 ${
-      sidebarOpen ? 'ml-0 lg:ml-64' : 'ml-0'
-    } ${darkMode ? 'bg-gray-800 text-white' : 'bg-[#2563EB] text-white'}`}>
-      <div className="w-full px-6 md:px-12 py-8 md:py-10">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
-            {/* Logo and Description - Vertical Layout, Center Aligned */}
-            <div className="flex flex-col items-center text-center">
-              <img 
-                src={logo} 
-                alt="BRIDA Jatim" 
-                className="h-16 md:h-20 w-auto mb-3" 
-              />
-              <p className="text-sm md:text-base font-medium text-white leading-snug">
-                Badan Riset dan Inovasi Daerah<br />Provinsi Jawa Timur
+    <footer
+      id="footer"
+      style={{
+        background: '#0f172a',
+        color: 'white',
+        marginLeft: sidebarOpen ? '256px' : '0',
+        transition: 'margin-left .3s',
+      }}
+    >
+      <style>{`
+        /* Footer responsive grid */
+        .footer-grid {
+          display: grid;
+          grid-template-columns: 260px 1fr 1fr;
+          gap: 64px;
+          align-items: flex-start;
+        }
+        .footer-collab {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+        .footer-logos {
+          display: flex;
+          gap: 24px;
+          align-items: flex-start;
+          justify-content: center;
+          width: 100%;
+        }
+        .footer-wrap {
+          padding: 56px 80px 48px;
+        }
+
+        /* Tablet ≤ 1024px */
+        @media (max-width: 1024px) {
+          .footer-wrap { padding: 48px 40px 40px; }
+          .footer-grid { gap: 40px; }
+        }
+
+        /* Mobile ≤ 768px */
+        @media (max-width: 768px) {
+          .footer-wrap { padding: 40px 24px 32px; }
+          .footer-grid {
+            grid-template-columns: 1fr;
+            gap: 36px;
+          }
+          .footer-collab { align-items: flex-start; }
+          .footer-logos { justify-content: flex-start; gap: 32px; }
+        }
+      `}</style>
+
+      {/* Gradient top border */}
+      <div style={{ height: '3px', background: 'linear-gradient(90deg,#2563eb 0%,#06b6d4 50%,#2563eb 100%)' }} />
+
+      <div className="footer-wrap">
+        <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+          <div className="footer-grid">
+
+            {/* ── Col 1: In Collaboration with ── */}
+            <div className="footer-collab">
+              <p style={{ fontWeight: 700, fontSize: '14px', color: '#ffffff', marginBottom: '20px', textAlign: 'center', width: '100%' }}>
+                In Collaboration with:
               </p>
+              <div className="footer-logos">
+                {/* BRIDA */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <img
+                    src="/images/logo-brida-jatim.png"
+                    alt="BRIDA"
+                    style={{ height: '56px', width: 'auto', objectFit: 'contain', marginBottom: '10px' }}
+                  />
+                  <p style={{ fontSize: '12px', textAlign: 'center', lineHeight: 1.5, color: '#94a3b8', margin: 0 }}>
+                    Badan Riset dan Inovasi<br />Daerah Prov. Jatim
+                  </p>
+                </div>
+                {/* PENS */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <img
+                    src="/images/logo-pens.png"
+                    alt="PENS"
+                    style={{ height: '56px', width: 'auto', objectFit: 'contain', marginBottom: '10px' }}
+                  />
+                  <p style={{ fontSize: '12px', textAlign: 'center', lineHeight: 1.5, color: '#94a3b8', margin: 0 }}>
+                    Politeknik Elektronika Negeri<br />Surabaya
+                  </p>
+                </div>
+              </div>
             </div>
 
-            {/* Contact Information */}
+            {/* ── Col 2: Hubungi Kami ── */}
             <div>
-              <h4 className="font-bold text-base md:text-lg mb-4">Kontak Kami</h4>
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <MapPin size={18} className="flex-shrink-0 mt-1" />
-                  <div className="text-sm text-blue-100">
-                    <p>Jl. Gayung Kebonsari No.56</p>
-                    <p>Gayungan, Kec. Gayungan</p>
-                    <p>Surabaya, Jawa Timur 60235</p>
-                  </div>
+              <p style={{ fontWeight: 700, fontSize: '15px', color: '#ffffff', marginBottom: '20px' }}>
+                Hubungi Kami
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                  <MapPin size={16} color="#94a3b8" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <p style={{ fontSize: '14px', color: '#94a3b8', lineHeight: 1.65, margin: 0 }}>
+                    Jl. Gayung Kebonsari No.56<br />
+                    Gayungan, Surabaya<br />
+                    Jawa Timur 60235
+                  </p>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Phone size={18} className="flex-shrink-0" />
-                  <a href="tel:+62318290738" className="text-sm text-blue-100 hover:text-white transition-colors">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <Phone size={16} color="#94a3b8" style={{ flexShrink: 0 }} />
+                  <a href="tel:+62318290738" style={{ fontSize: '14px', color: '#94a3b8', textDecoration: 'none', transition: 'color .2s' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = 'white')}
+                    onMouseLeave={e => (e.currentTarget.style.color = '#94a3b8')}>
                     (031) 8290738
                   </a>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Mail size={18} className="flex-shrink-0" />
-                  <a href="mailto:ses-diri@brin.go.id" className="text-sm text-blue-100 hover:text-white transition-colors">
-                    ses-diri@brin.go.id
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <Mail size={16} color="#94a3b8" style={{ flexShrink: 0 }} />
+                  <a href="mailto:sec.dn@brin.go.id" style={{ fontSize: '14px', color: '#94a3b8', textDecoration: 'none', transition: 'color .2s' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = 'white')}
+                    onMouseLeave={e => (e.currentTarget.style.color = '#94a3b8')}>
+                    sec.dn@brin.go.id
                   </a>
                 </div>
               </div>
             </div>
 
-            {/* Social Media */}
+            {/* ── Col 3: Ikuti Kami ── */}
             <div>
-              <h4 className="font-bold text-base md:text-lg mb-4">Ikuti Kami</h4>
-              <div className="space-y-3">
-                <a
-                  href="https://www.instagram.com/bridajatim/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 text-sm text-blue-100 hover:text-white transition-colors group"
-                >
-                  <div className="bg-blue-600 p-2 rounded-lg group-hover:bg-blue-700 transition-colors">
-                    <Instagram size={18} />
+              <p style={{ fontWeight: 700, fontSize: '15px', color: '#ffffff', marginBottom: '20px' }}>
+                Ikuti Kami
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <a href="https://www.instagram.com/bridajatim/" target="_blank" rel="noopener noreferrer"
+                  style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#94a3b8', textDecoration: 'none', transition: 'color .2s' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = 'white')}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#94a3b8')}>
+                  <div style={{ background: 'linear-gradient(135deg,#2563eb,#06b6d4)', borderRadius: '10px', padding: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Instagram size={17} color="white" />
                   </div>
-                  <span>@bridajatim</span>
-                  <ExternalLink size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <span style={{ fontSize: '14px' }}>@bridajatim</span>
                 </a>
-                <a
-                  href="https://x.com/balitbangjatim"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 text-sm text-blue-100 hover:text-white transition-colors group"
-                >
-                  <div className="bg-blue-600 p-2 rounded-lg group-hover:bg-blue-700 transition-colors">
-                    <Twitter size={18} />
+                <a href="https://x.com/balitbangjatim" target="_blank" rel="noopener noreferrer"
+                  style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#94a3b8', textDecoration: 'none', transition: 'color .2s' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = 'white')}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#94a3b8')}>
+                  <div style={{ background: 'linear-gradient(135deg,#2563eb,#06b6d4)', borderRadius: '10px', padding: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Twitter size={17} color="white" />
                   </div>
-                  <span>@balitbangjatim</span>
-                  <ExternalLink size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <span style={{ fontSize: '14px' }}>@balitbangjatim</span>
                 </a>
               </div>
             </div>
+
           </div>
 
-          {/* Full-Width Copyright Section */}
-          <div className="mt-8 pt-6 border-t border-blue-400">
-            <p className="text-xs md:text-sm text-center text-blue-100">
+          {/* Copyright */}
+          <div style={{ maxWidth: '1000px', margin: '40px auto 0', paddingTop: '24px', borderTop: '1px solid rgba(100,116,139,.22)', textAlign: 'center' }}>
+            <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>
               © {new Date().getFullYear()} BRIDA Jatim. All Rights Reserved
             </p>
           </div>
