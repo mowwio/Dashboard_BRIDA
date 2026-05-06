@@ -1,95 +1,37 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react'; // useEffect digunakan untuk trigger PDF generation
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Cell } from 'recharts';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import logo from '/images/logo-brida-jatim.png';
 
-const API_URL = "http://localhost:8000";
 
 interface ReportDashboardProps {
   onClose: () => void;
+  trendData: any[];
+  maturityTrendData: any[];
+  topOPD: any[];
+  topUrusan: any[];
+  stats: any;
+  aiInsights: any[];
+  selectedYear: 'all' | number;
+  selectedYearMaturity: 'all' | number;
 }
 
-export function ReportDashboard({ onClose }: ReportDashboardProps) {
+export function ReportDashboard({
+  onClose,
+  trendData,
+  maturityTrendData,
+  topOPD,
+  topUrusan,
+  stats,
+  aiInsights,
+  selectedYear,
+  selectedYearMaturity,
+}: ReportDashboardProps) {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading] = useState(false); // data sudah tersedia dari props
   const [progress, setProgress] = useState(0);
-  const [statusMessage, setStatusMessage] = useState('Memuat data...');
-
-  // State untuk data
-  const [trendData, setTrendData] = useState<any[]>([]);
-  const [maturityData, setMaturityData] = useState<any[]>([]);
-  const [topOPD, setTopOPD] = useState<any[]>([]);
-  const [topUrusan, setTopUrusan] = useState<any[]>([]);
-  const [stats, setStats] = useState<any>({});
-  const [aiInsights, setAiInsights] = useState<any[]>([]);
-
-  // Fetch data dari API
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        setStatusMessage('Mengambil data dari server...');
-
-        const [trendRes, maturityRes, opdRes, urusanRes, statsRes, aiRes] = await Promise.all([
-          fetch(`${API_URL}/dashboard/trend`),
-          fetch(`${API_URL}/dashboard/maturity`),
-          fetch(`${API_URL}/dashboard/top-opd`),
-          fetch(`${API_URL}/dashboard/top-urusan`),
-          fetch(`${API_URL}/dashboard/stats`),
-          fetch(`${API_URL}/dashboard/ai-insight`)
-        ]);
-
-        const trendRaw = await trendRes.json();
-        const maturityRaw = await maturityRes.json();
-        const opdRaw = await opdRes.json();
-        const urusanRaw = await urusanRes.json();
-        const statsRaw = await statsRes.json();
-        const aiRaw = await aiRes.json();
-
-        // Normalize trend data
-        const trend = trendRaw.map((d: any) => ({
-          tahun: Number(d.tahun),
-          digital: Number(d.digital),
-          nondigital: Number(d.nondigital ?? 0),
-          teknologi: Number(d.teknologi),
-        }));
-
-        // Normalize maturity data
-        const maturity = maturityRaw.map((d: any) => ({
-          level: d.level,
-          jumlah: Number(d.jumlah),
-        }));
-
-        // Normalize OPD data
-        const opd = opdRaw.map((d: any) => ({
-          name: d.name,
-          jumlah: Number(d.jumlah),
-        }));
-
-        // Normalize Urusan data
-        const urusan = urusanRaw.map((d: any) => ({
-          name: d.name,
-          jumlah: Number(d.jumlah),
-        }));
-
-        setTrendData(trend);
-        setMaturityData(maturity);
-        setTopOPD(opd);
-        setTopUrusan(urusan);
-        setStats(statsRaw);
-        setAiInsights(aiRaw);
-
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-        setStatusMessage('Gagal memuat data');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
+  const [statusMessage, setStatusMessage] = useState('Menyiapkan laporan...');
 
   useEffect(() => {
     if (isLoading) return;
@@ -295,7 +237,7 @@ export function ReportDashboard({ onClose }: ReportDashboardProps) {
                     day: 'numeric',
                     month: 'long',
                     year: 'numeric'
-                  })} | Halaman 1 dari 2
+                  })} | Filter: {selectedYear === 'all' ? 'Semua Tahun' : `Tahun ${selectedYear}`} | Halaman 1 dari 2
                 </p>
               </div>
             </div>
@@ -381,18 +323,20 @@ export function ReportDashboard({ onClose }: ReportDashboardProps) {
                     margin: 0,
                     marginBottom: '8px'
                   }}>
-                    Tren Penerapan Inovasi Per Tahun
+                    {selectedYear === 'all'
+                      ? 'Tren Jenis Inovasi Per Tahun'
+                      : `Tren Jenis Inovasi Per Bulan (${selectedYear})`}
                   </h3>
                   <div style={{ width: '100%', height: '200px' }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={trendData} margin={{ top: 5, right: 20, left: 0, bottom: 20 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                         <XAxis
-                          dataKey="tahun"
+                          dataKey={selectedYear === 'all' ? 'tahun' : 'bulan'}
                           stroke="#6b7280"
                           style={{ fontSize: '10px' }}
                           label={{
-                            value: 'Tahun',
+                            value: selectedYear === 'all' ? 'Tahun' : 'Bulan',
                             position: 'insideBottom',
                             offset: -10,
                             fill: '#6b7280',
@@ -425,7 +369,7 @@ export function ReportDashboard({ onClose }: ReportDashboardProps) {
                   </div>
                 </div>
 
-                {/* Jumlah Inovasi Berdasarkan Tahapan */}
+                {/* Tren Tahapan Inovasi */}
                 <div style={{
                   backgroundColor: '#ffffff',
                   padding: '12px',
@@ -439,22 +383,22 @@ export function ReportDashboard({ onClose }: ReportDashboardProps) {
                     margin: 0,
                     marginBottom: '8px'
                   }}>
-                    Jumlah Inovasi Berdasarkan Tahapan
+                    {selectedYearMaturity === 'all'
+                      ? 'Tren Tahapan Inovasi Per Tahun'
+                      : `Tren Tahapan Inovasi Per Bulan (${selectedYearMaturity})`}
                   </h3>
                   <div style={{ width: '100%', height: '200px' }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={maturityData} margin={{ top: 5, right: 20, left: 0, bottom: 40 }}>
+                      <LineChart data={maturityTrendData} margin={{ top: 5, right: 20, left: 0, bottom: 20 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                         <XAxis
-                          dataKey="level"
+                          dataKey={selectedYearMaturity === 'all' ? 'tahun' : 'bulan'}
                           stroke="#6b7280"
                           style={{ fontSize: '10px' }}
-                          angle={0}
-                          textAnchor="middle"
                           label={{
-                            value: 'Tahapan Inovasi',
+                            value: selectedYearMaturity === 'all' ? 'Tahun' : 'Bulan',
                             position: 'insideBottom',
-                            offset: -25,
+                            offset: -10,
                             fill: '#6b7280',
                             style: { fontSize: '10px' }
                           }}
@@ -477,8 +421,10 @@ export function ReportDashboard({ onClose }: ReportDashboardProps) {
                             fontSize: '10px'
                           }}
                         />
-                        <Bar dataKey="jumlah" fill="#2563EB" radius={[8, 8, 0, 0]} />
-                      </BarChart>
+                        <Line type="monotone" dataKey="penerapan" stroke="#2563EB" strokeWidth={2} dot={{ fill: '#2563EB', r: 4 }} name="Penerapan" />
+                        <Line type="monotone" dataKey="inisiatif" stroke="#10B981" strokeWidth={2} dot={{ fill: '#10B981', r: 4 }} name="Inisiatif" />
+                        <Line type="monotone" dataKey="ujicoba"   stroke="#F59E0B" strokeWidth={2} dot={{ fill: '#F59E0B', r: 4 }} name="Uji Coba" />
+                      </LineChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
@@ -496,7 +442,7 @@ export function ReportDashboard({ onClose }: ReportDashboardProps) {
                 BADAN RISET DAN INOVASI DAERAH PROVINSI JAWA TIMUR
               </p>
               <p style={{ fontSize: '9px', color: '#6b7280', margin: 0, lineHeight: '1.4' }}>
-                Jl. Ahmad Yani No. 152, Surabaya | Email: brida@jatimprov.go.id | Website: brida.jatimprov.go.id
+                Jl. Gayung Kebonsari No.56, Gayungan, Kec. Gayungan, Surabaya, Jawa Timur 60235 <br /> Email: brida@jatimprov.go.id | Website: brida.jatimprov.go.id
               </p>
             </div>
           </div>
@@ -563,7 +509,7 @@ export function ReportDashboard({ onClose }: ReportDashboardProps) {
                     day: 'numeric',
                     month: 'long',
                     year: 'numeric'
-                  })} | Halaman 2 dari 2
+                  })} | Filter: {selectedYear === 'all' ? 'Semua Tahun' : `Tahun ${selectedYear}`} | Halaman 2 dari 2
                 </p>
               </div>
             </div>
@@ -739,7 +685,7 @@ export function ReportDashboard({ onClose }: ReportDashboardProps) {
                 BADAN RISET DAN INOVASI DAERAH PROVINSI JAWA TIMUR
               </p>
               <p style={{ fontSize: '9px', color: '#6b7280', margin: 0, lineHeight: '1.4' }}>
-                Jl. Ahmad Yani No. 152, Surabaya | Email: brida@jatimprov.go.id | Website: brida.jatimprov.go.id
+                Jl. Gayung Kebonsari No.56, Gayungan, Kec. Gayungan, Surabaya, Jawa Timur 60235 <br /> Email: brida@jatimprov.go.id | Website: brida.jatimprov.go.id
               </p>
             </div>
           </div>

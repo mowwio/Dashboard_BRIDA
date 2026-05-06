@@ -5,24 +5,19 @@ from app.database import database
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 
-# 1. Trend Inovasi per Tahun atau per Bulan
+# 1. Trend Jenis Inovasi per Tahun atau per Bulan (berdasarkan tanggal_input)
 @router.get("/trend")
 async def get_trend(tahun: Optional[int] = None):
     """
-    Endpoint untuk mendapatkan data trend inovasi.
+    Endpoint untuk mendapatkan data trend jenis inovasi (Digital/Non Digital/Teknologi).
 
     - Jika `tahun` tidak diberikan (None): Mengembalikan data per TAHUN (semua tahun)
-    - Jika `tahun` diberikan (misal 2022): Mengembalikan data per BULAN untuk tahun tersebut
+    - Jika `tahun` diberikan (misal 2024): Mengembalikan data per BULAN untuk tahun tersebut
 
-    Args:
-        tahun (Optional[int]): Tahun yang ingin difilter. Jika None, tampilkan semua tahun.
-
-    Returns:
-        List: Data trend inovasi per tahun atau per bulan
+    Menggunakan tanggal_input agar semua data ter-cover tanpa batasan tahun minimum.
     """
 
     if tahun is None:
-        # Jika tidak ada parameter tahun, return data per TAHUN
         query = """
         SELECT 
             EXTRACT(YEAR FROM tanggal_penerapan)::int AS tahun,
@@ -31,13 +26,11 @@ async def get_trend(tahun: Optional[int] = None):
             COUNT(*) FILTER (WHERE jenis = 'Teknologi') AS teknologi
         FROM data_inovasi
         WHERE tanggal_penerapan IS NOT NULL
-            AND EXTRACT(YEAR FROM tanggal_penerapan) >= 2022
         GROUP BY tahun
         ORDER BY tahun;
         """
         return await database.fetch_all(query)
     else:
-        # Jika ada parameter tahun, return data per BULAN untuk tahun tersebut
         query = """
         SELECT 
             EXTRACT(MONTH FROM tanggal_penerapan)::int AS bulan,
@@ -52,7 +45,47 @@ async def get_trend(tahun: Optional[int] = None):
         return await database.fetch_all(query, {"tahun": tahun})
 
 
-# 2. Maturity / Tahapan Inovasi
+# 2. Trend Tahapan Inovasi per Tahun atau per Bulan (berdasarkan tanggal_input)
+@router.get("/maturity-trend")
+async def get_maturity_trend(tahun: Optional[int] = None):
+    """
+    Endpoint untuk mendapatkan tren jumlah inovasi per tahapan per tahun/bulan.
+    Digunakan untuk grafik line chart tahapan (Penerapan/Inisiatif/Uji Coba).
+
+    - Jika `tahun` tidak diberikan (None): Mengembalikan data per TAHUN (semua tahun)
+    - Jika `tahun` diberikan (misal 2024): Mengembalikan data per BULAN untuk tahun tersebut
+
+    Menggunakan tanggal_input agar semua data ter-cover.
+    """
+    if tahun is None:
+        query = """
+        SELECT 
+            EXTRACT(YEAR FROM tanggal_penerapan)::int AS tahun,
+            COUNT(*) FILTER (WHERE tahapan_inovasi = 'Penerapan') AS penerapan,
+            COUNT(*) FILTER (WHERE tahapan_inovasi = 'Inisiatif') AS inisiatif,
+            COUNT(*) FILTER (WHERE tahapan_inovasi = 'Uji Coba') AS ujicoba
+        FROM data_inovasi
+        WHERE tanggal_penerapan IS NOT NULL
+        GROUP BY tahun
+        ORDER BY tahun;
+        """
+        return await database.fetch_all(query)
+    else:
+        query = """
+        SELECT 
+            EXTRACT(MONTH FROM tanggal_penerapan)::int AS bulan,
+            COUNT(*) FILTER (WHERE tahapan_inovasi = 'Penerapan') AS penerapan,
+            COUNT(*) FILTER (WHERE tahapan_inovasi = 'Inisiatif') AS inisiatif,
+            COUNT(*) FILTER (WHERE tahapan_inovasi = 'Uji Coba') AS ujicoba
+        FROM data_inovasi
+        WHERE EXTRACT(YEAR FROM tanggal_penerapan) = :tahun
+        GROUP BY bulan
+        ORDER BY bulan;
+        """
+        return await database.fetch_all(query, {"tahun": tahun})
+
+
+# 3. Maturity / Tahapan Inovasi (total, untuk referensi lain jika dibutuhkan)
 @router.get("/maturity")
 async def get_maturity():
     query = """
@@ -66,7 +99,7 @@ async def get_maturity():
     return await database.fetch_all(query)
 
 
-# 3. Top OPD
+# 4. Top OPD
 @router.get("/top-opd")
 async def get_top_opd():
     query = """
@@ -81,7 +114,7 @@ async def get_top_opd():
     return await database.fetch_all(query)
 
 
-# 4. Top Urusan
+# 5. Top Urusan
 @router.get("/top-urusan")
 async def get_top_urusan():
     query = """
@@ -96,7 +129,7 @@ async def get_top_urusan():
     return await database.fetch_all(query)
 
 
-# 5. Statistik Ringkas Dashboard
+# 6. Statistik Ringkas Dashboard
 @router.get("/stats")
 async def get_stats():
     query = """
@@ -105,7 +138,7 @@ async def get_stats():
         ROUND(AVG(kematangan)::numeric, 1) AS rata_kematangan,
         COUNT(*) FILTER (WHERE jenis = 'Digital') AS inovasi_digital,
         COUNT(*) FILTER (
-            WHERE EXTRACT(YEAR FROM tanggal_penerapan) = EXTRACT(YEAR FROM CURRENT_DATE)
+            WHERE EXTRACT(YEAR FROM tanggal_input) = EXTRACT(YEAR FROM CURRENT_DATE)
         ) AS inovasi_tahun_ini
     FROM data_inovasi;
     """

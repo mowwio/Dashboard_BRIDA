@@ -32,6 +32,7 @@ interface InovasiPoint {
   pemda: string; jenis: string; kematangan: number;
   video?: string;      // 'Ada' | 'Tidak' | null
   link_video?: string; // URL (YouTube, youtu.be, Drive, dll)
+  tanggal_penerapan?: string; // Tambahan untuk filter tahun
 }
 interface Recommendation {
   inovasi_1_id: number; inovasi_1_judul: string; inovasi_2_id: number;
@@ -250,12 +251,11 @@ const getMarkerColor = (k: number) => {
 
 // ============================================================
 // HOVER COLOR: berdasarkan rata-rata kematangan wilayah
-// (menggantikan cluster color — tidak ada warna default)
 // ============================================================
 const getKabHoverColor = (avgKematangan: number): string => {
   if (avgKematangan >= 65) return '#16a34a'; // hijau — Sangat Inovatif
   if (avgKematangan >= 45) return '#eab308'; // kuning — Inovatif
-  return '#ef4444';                           // merah — Kurang Inovatif
+  return '#ef4444';                          // merah — Kurang Inovatif
 };
 
 const getMaturityLabel = (k: number) =>
@@ -273,15 +273,13 @@ const getVideoEmbedInfo = (url: string): { embedUrl: string; isEmbed: boolean } 
   const m2 = url.match(/(?:youtu\.be\/)([a-zA-Z0-9_-]+)/);
   if (m2) return { embedUrl: `https://www.youtube.com/embed/${m2[1]}?autoplay=1`, isEmbed: true };
 
-  // Google Drive file — konversi ke preview embed
+  // Google Drive file
   const m3 = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
   if (m3) return { embedUrl: `https://drive.google.com/file/d/${m3[1]}/preview`, isEmbed: true };
 
-  // Google Drive folder atau link lain — buka di tab baru
   return { embedUrl: url, isEmbed: false };
 };
 
-// Backward-compat alias
 const getYouTubeEmbedUrl = (url: string): string => getVideoEmbedInfo(url).embedUrl;
 
 // ============================================================
@@ -299,7 +297,6 @@ function VideoModal({ videoUrl, isEmbed, onClose, darkMode }: { videoUrl: string
         style={{ zIndex: 99999, maxWidth: '860px', overflow: 'hidden' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header — cukup ruang, tidak dempet */}
         <div className={`flex items-center justify-between px-6 py-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
           <h3 className={`text-base font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Video Profil Inovasi</h3>
           <button
@@ -311,7 +308,6 @@ function VideoModal({ videoUrl, isEmbed, onClose, darkMode }: { videoUrl: string
         </div>
 
         {isEmbed ? (
-          /* Video embed — rasio 16:9 penuh */
           <div style={{ position: 'relative', width: '100%', paddingBottom: '56.25%', background: '#000' }}>
             <iframe
               src={videoUrl}
@@ -322,7 +318,6 @@ function VideoModal({ videoUrl, isEmbed, onClose, darkMode }: { videoUrl: string
             />
           </div>
         ) : (
-          /* Non-embeddable — Drive folder, tuxedovation, dll */
           <div
             className={`flex flex-col items-center justify-center ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}
             style={{ padding: '56px 40px', gap: '24px' }}
@@ -360,7 +355,6 @@ function VideoModal({ videoUrl, isEmbed, onClose, darkMode }: { videoUrl: string
 
 // ============================================================
 // LEGEND COMPONENT
-// REVISI: Baris CLUSTER dihapus — tidak ada lagi cluster color
 // ============================================================
 function MapLegend({
   darkMode,
@@ -406,8 +400,6 @@ function MapLegend({
       darkMode ? 'bg-gray-800/90 border-gray-700' : 'bg-white/95 border-gray-200'
     }`}>
       <div className="flex flex-col gap-3">
-
-        {/* ── Row 1: MARKER + GARIS REKOMENDASI ── */}
         <div className="flex flex-wrap items-center justify-between gap-y-2">
           <div className="flex flex-wrap items-center gap-y-2">
             <span className={rowLabelClass} style={{ minWidth: 88 }}>MARKER</span>
@@ -424,7 +416,6 @@ function MapLegend({
               ))}
             </div>
           </div>
-          {/* Garis Rekomendasi Kolaborasi */}
           <span className={pillClass()}>
             <svg width="26" height="8" viewBox="0 0 26 8" style={{ flexShrink: 0 }}>
               <line x1="0" y1="4" x2="26" y2="4" stroke="#2563EB" strokeWidth="2.5" strokeDasharray="5 4" strokeLinecap="round" />
@@ -433,10 +424,8 @@ function MapLegend({
           </span>
         </div>
 
-        {/* ── Divider ── */}
         <div className={`h-px ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
 
-        {/* ── Row 2: JALUR TRANSPORTASI ── */}
         <div className="flex flex-wrap items-center gap-y-2">
           <div className="flex flex-col flex-shrink-0" style={{ minWidth: 88 }}>
             <div className="flex items-center gap-1">
@@ -449,7 +438,6 @@ function MapLegend({
             <span className={`mt-0.5 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} style={{ fontSize: 10 }}>Klik untuk toggle</span>
           </div>
           <div className="flex flex-wrap gap-2 ml-4">
-            {/* Toggle Tol/Jalan Nasional */}
             <button
               onClick={handleToggleRoads}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold select-none transition-all duration-150 ${
@@ -476,7 +464,6 @@ function MapLegend({
               }} />
             </button>
 
-            {/* Toggle Jalur Kereta */}
             <button
               onClick={handleToggleRailway}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold select-none transition-all duration-150 ${
@@ -505,10 +492,8 @@ function MapLegend({
           </div>
         </div>
 
-        {/* ── Divider ── */}
         <div className={`h-px ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
 
-        {/* ── Row 3: WILAYAH — hover color pills ── */}
         <div className="flex flex-wrap items-center gap-y-2">
           <span className={rowLabelClass} style={{ minWidth: 88 }}>WILAYAH</span>
           <div className="flex flex-wrap gap-2 ml-4">
@@ -547,6 +532,8 @@ export function MapInnovation({ darkMode }: MapInnovationProps) {
   const [showRoads, setShowRoads]             = useState(false);
   const [showRailway, setShowRailway]         = useState(false);
   const [loadingTransport, setLoadingTransport] = useState(false);
+  const [selectedYear, setSelectedYear]       = useState<string>('Semua'); // State Filter Tahun
+
   const showRoadsRef    = useRef(false);
   const showRailwayRef  = useRef(false);
 
@@ -591,11 +578,9 @@ export function MapInnovation({ darkMode }: MapInnovationProps) {
     }
     try {
       setLoading(true); setError(null);
-      // REVISI: endpoint baru /points (tidak ada cluster)
       const res = await fetch('http://127.0.0.1:8000/api/peta-inovasi/points');
       if (!res.ok) throw new Error(`Gagal mengambil data (Status: ${res.status})`);
       const json = await res.json();
-      // /points mengembalikan { total, innovations }
       const data: MapData = { innovations: json.innovations ?? [] };
       cachedMapData = data;
       setMapData(data);
@@ -624,7 +609,6 @@ export function MapInnovation({ darkMode }: MapInnovationProps) {
     }
 
     try {
-      // REVISI: max_distance_km=50 (dari 150)
       const res = await fetch(`http://127.0.0.1:8000/api/peta-inovasi/recommendations/${inv.no}?top_n=5&max_distance_km=50`);
       const data = res.ok ? await res.json() : { recommendations: [] };
       const recs: Recommendation[] = data.recommendations ?? [];
@@ -669,10 +653,6 @@ export function MapInnovation({ darkMode }: MapInnovationProps) {
     });
   };
 
-  // ============================================================
-  // CHOROPLETH — REVISI: tidak ada warna default
-  // Warna HANYA muncul saat hover, berdasarkan rata-rata kematangan
-  // ============================================================
   const drawChoropleth = async (L: any, innovations: InovasiPoint[]) => {
     if (!choroplethLayerRef.current) return;
     choroplethLayerRef.current.clearLayers();
@@ -687,7 +667,6 @@ export function MapInnovation({ darkMode }: MapInnovationProps) {
         cachedGeoJSON = await res.json();
       }
 
-      // Hitung rata-rata kematangan per kabupaten
       const kabKematangan: Map<string, number[]> = new Map();
       const kabInovasiCount: Map<string, number> = new Map();
 
@@ -706,7 +685,6 @@ export function MapInnovation({ darkMode }: MapInnovationProps) {
 
       L.geoJSON(cachedGeoJSON, {
         style: () => ({
-          // Default: transparan — tidak ada warna sama sekali
           fillColor:   '#9CA3AF',
           fillOpacity: 0,
           color:       '#9CA3AF',
@@ -722,7 +700,6 @@ export function MapInnovation({ darkMode }: MapInnovationProps) {
           const hoverColor  = getKabHoverColor(avgKem);
           const matLabel    = getMaturityLabel(avgKem);
 
-          // Tooltip muncul saat hover
           layer.bindTooltip(
             `<div style="font-family:sans-serif;padding:6px 10px;min-width:170px;">
               <b style="font-size:13px;color:#1f2937">${displayName}</b><br/>
@@ -735,7 +712,6 @@ export function MapInnovation({ darkMode }: MapInnovationProps) {
             { sticky: true, opacity: 0.97 }
           );
 
-          // Hover: baru tampil warna
           layer.on('mouseover', () => {
             layer.setStyle({
               fillColor:   hasData ? hoverColor : '#9CA3AF',
@@ -746,7 +722,6 @@ export function MapInnovation({ darkMode }: MapInnovationProps) {
             });
           });
 
-          // Mouse out: kembali transparan
           layer.on('mouseout', () => {
             layer.setStyle({
               fillColor:   '#9CA3AF',
@@ -764,9 +739,6 @@ export function MapInnovation({ darkMode }: MapInnovationProps) {
     }
   };
 
-  // ============================================================
-  // TRANSPORT LAYERS
-  // ============================================================
   const drawRoads = async (L: any) => {
     if (!roadsLayerRef.current) return;
     try {
@@ -894,9 +866,6 @@ export function MapInnovation({ darkMode }: MapInnovationProps) {
     setTimeout(() => setLoadingTransport(false), 0);
   };
 
-  // ============================================================
-  // UPDATE MAP
-  // ============================================================
   const updateMapMarkers = async () => {
     if (!mapContainerRef.current || !mapData) return;
     const L = await loadLeaflet();
@@ -918,7 +887,6 @@ export function MapInnovation({ darkMode }: MapInnovationProps) {
       polylinesLayerRef.current  = L.layerGroup().addTo(map);
     }
 
-    // REVISI: drawChoropleth tidak butuh mapData lagi (tidak pakai cluster)
     await drawChoropleth(L, filtered);
 
     markersLayerRef.current.clearLayers();
@@ -961,9 +929,6 @@ export function MapInnovation({ darkMode }: MapInnovationProps) {
     }
   };
 
-  // ============================================================
-  // OSRM
-  // ============================================================
   const fetchOSRMRoute = async (
     lat1: number, lon1: number,
     lat2: number, lon2: number
@@ -1033,9 +998,6 @@ export function MapInnovation({ darkMode }: MapInnovationProps) {
     };
   };
 
-  // ============================================================
-  // TRANSPORT CORRIDOR ANALYSIS
-  // ============================================================
   const [transportAnalysisMap, setTransportAnalysisMap] = useState<Map<number, TransportCorridorResult>>(new Map());
 
   useEffect(() => {
@@ -1134,9 +1096,33 @@ export function MapInnovation({ darkMode }: MapInnovationProps) {
     return () => { cancelled = true; };
   }, [selectedInovasi, selectedRecs, mapData]);
 
+  // --- LOGIKA FILTER TAHUN ---
+  const availableYears = ['Semua'];
+  if (mapData) {
+    const years = new Set<string>();
+    mapData.innovations.forEach(inv => {
+      if (inv.tanggal_penerapan) {
+        // Ambil 4 karakter pertama (Asumsi format YYYY-MM-DD)
+        const year = String(inv.tanggal_penerapan).substring(0, 4);
+        if (year && !isNaN(Number(year))) years.add(year);
+      }
+    });
+    availableYears.push(...Array.from(years).sort().reverse()); 
+  }
+
   const top5Innovations = mapData
-    ? [...mapData.innovations].sort((a, b) => b.kematangan - a.kematangan).slice(0, 5)
+    ? [...mapData.innovations]
+        .filter(inv => {
+          if (selectedYear === 'Semua') return true;
+          if (!inv.tanggal_penerapan) return false;
+          const year = String(inv.tanggal_penerapan).substring(0, 4);
+          return year === selectedYear;
+        })
+        .sort((a, b) => b.kematangan - a.kematangan)
+        .slice(0, 5)
     : [];
+  // ----------------------------
+
   const avgKematangan = mapData && mapData.innovations.length
     ? (mapData.innovations.reduce((s, i) => s + i.kematangan, 0) / mapData.innovations.length).toFixed(1)
     : '0';
@@ -1192,7 +1178,6 @@ export function MapInnovation({ darkMode }: MapInnovationProps) {
               <div ref={mapContainerRef} style={{ height: '500px', width: '100%', borderRadius: '8px' }} />
             </div>
 
-            {/* REVISI: MapLegend tidak menerima clusters & mapInstanceRef — baris cluster dihapus */}
             <MapLegend
               darkMode={darkMode}
               showRoads={showRoads}
@@ -1207,10 +1192,35 @@ export function MapInnovation({ darkMode }: MapInnovationProps) {
         {/* ── Sidebar ── */}
         <div className="lg:col-span-3 space-y-6">
           <div className={`rounded-lg shadow-md p-5 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-            <div className="flex items-center gap-2 mb-4">
-              <Award className="text-yellow-500" size={20} />
-              <h4 className={`font-bold text-sm ${darkMode ? 'text-white' : 'text-gray-800'}`}>Top 5 Inovasi Terbaik</h4>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Award className="text-yellow-500" size={20} />
+                <h4 className={`font-bold text-sm ${darkMode ? 'text-white' : 'text-gray-800'}`}>Top 5 Inovasi Terbaik</h4>
+              </div>
+              
+              {/* Dropdown Filter Tahun */}
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className={`text-xs border rounded-md px-2 py-1 outline-none transition-colors cursor-pointer shadow-sm ${
+                  darkMode 
+                    ? 'bg-gray-700 border-gray-600 text-white focus:border-blue-500' 
+                    : 'bg-white border-gray-200 text-gray-700 focus:border-blue-500 hover:bg-gray-50'
+                }`}
+              >
+                {availableYears.map(year => (
+                  <option key={year} value={year}>{year === 'Semua' ? 'Semua Tahun' : year}</option>
+                ))}
+              </select>
             </div>
+            
+            {/* Jika tidak ada data di tahun tersebut */}
+            {top5Innovations.length === 0 && (
+              <div className={`text-center py-6 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                Tidak ada data inovasi untuk tahun {selectedYear}.
+              </div>
+            )}
+
             <div className="space-y-3">
               {top5Innovations.map((inv, index) => {
                 const colors = getMarkerColor(inv.kematangan);
@@ -1242,12 +1252,11 @@ export function MapInnovation({ darkMode }: MapInnovationProps) {
             </div>
           </div>
 
-          {/* REVISI: "Total Cluster" dihapus dari statistik */}
           <div className={`rounded-lg shadow-md p-5 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
             <h4 className={`font-bold text-sm mb-3 ${darkMode ? 'text-white' : 'text-gray-800'}`}>Statistik Peta</h4>
             <div className="space-y-2">
               {[
-                { label: 'Total Inovasi',       value: mapData.innovations.length },
+                { label: 'Total Inovasi',        value: mapData.innovations.length },
                 { label: 'Rata-rata Kematangan', value: avgKematangan },
               ].map(({ label, value }) => (
                 <div key={label} className="flex justify-between">
@@ -1327,7 +1336,6 @@ export function MapInnovation({ darkMode }: MapInnovationProps) {
                       {selectedInovasi.lat.toFixed(4)}, {selectedInovasi.lon.toFixed(4)}
                     </p>
                   </div>
-                  {/* Tombol video — tampil jika video = 'Ada' dan link_video tersedia */}
                   {selectedInovasi.video === 'Ada' && selectedInovasi.link_video && selectedInovasi.link_video !== '-' && (() => {
                     const { embedUrl, isEmbed } = getVideoEmbedInfo(selectedInovasi.link_video!);
                     return embedUrl ? (

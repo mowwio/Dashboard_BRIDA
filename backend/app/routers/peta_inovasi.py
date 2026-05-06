@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api/peta-inovasi", tags=["Peta Inovasi"])
 async def _fetch_valid_innovations() -> List[dict]:
     query = """
         SELECT no, judul_inovasi, deskripsi, lat, lon, pemda, jenis, kematangan,
-               urusan_utama, urusan_lain_yang_beririsan, video, link_video
+               urusan_utama, urusan_lain_yang_beririsan, video, link_video, tanggal_penerapan
         FROM data_inovasi
         WHERE lat IS NOT NULL AND lon IS NOT NULL
     """

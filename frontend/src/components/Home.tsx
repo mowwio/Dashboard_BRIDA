@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer,
-  LineChart, Line, Cell
+  BarChart, Bar,
+  LineChart, Line,
 } from 'recharts';
 import {
   TrendingUp, Award, Sparkles, Calendar,
@@ -12,22 +13,22 @@ import { SkeletonLoader } from './SkeletonLoader';
 import { ReportDashboard } from './ReportDashboard';
 
 const API_URL = "http://localhost:8000";
-const AUTO_REFRESH_MS = 5 * 60 * 1000; // auto-refresh setiap 5 menit
+const AUTO_REFRESH_MS = 5 * 60 * 1000;
 
 interface HomeProps {
   darkMode: boolean;
 }
 
 const MONTHS = [
-  { num: 1, label: 'Jan' },
-  { num: 2, label: 'Feb' },
-  { num: 3, label: 'Mar' },
-  { num: 4, label: 'Apr' },
-  { num: 5, label: 'Mei' },
-  { num: 6, label: 'Jun' },
-  { num: 7, label: 'Jul' },
-  { num: 8, label: 'Agu' },
-  { num: 9, label: 'Sep' },
+  { num: 1,  label: 'Jan' },
+  { num: 2,  label: 'Feb' },
+  { num: 3,  label: 'Mar' },
+  { num: 4,  label: 'Apr' },
+  { num: 5,  label: 'Mei' },
+  { num: 6,  label: 'Jun' },
+  { num: 7,  label: 'Jul' },
+  { num: 8,  label: 'Agu' },
+  { num: 9,  label: 'Sep' },
   { num: 10, label: 'Okt' },
   { num: 11, label: 'Nov' },
   { num: 12, label: 'Des' },
@@ -36,47 +37,47 @@ const MONTHS = [
 export function Home({ darkMode }: HomeProps) {
 
   // ================== STATE ==================
-  const [selectedYear, setSelectedYear] = useState<'all' | number>('all');
-  const [availableYears, setAvailableYears] = useState<number[]>([]); // ← dinamis dari API
-  const [trendData, setTrendData] = useState<any[]>([]);
-  const [maturityData, setMaturityData] = useState<any[]>([]);
-  const [topOPD, setTopOPD] = useState<any[]>([]);
-  const [topUrusan, setTopUrusan] = useState<any[]>([]);
-  const [stats, setStats] = useState<any[]>([]);
-  const [aiInsights, setAiInsights] = useState<any[]>([]);
-  const [aiLoading, setAiLoading] = useState(true);
-  const [aiError, setAiError] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [selectedYear, setSelectedYear]                   = useState<'all' | number>('all');
+  const [selectedYearMaturity, setSelectedYearMaturity]   = useState<'all' | number>('all');
+  const [availableYears, setAvailableYears]               = useState<number[]>([]);
+  const [trendData, setTrendData]                         = useState<any[]>([]);
+  const [maturityTrendData, setMaturityTrendData]         = useState<any[]>([]);
+  const [topOPD, setTopOPD]                       = useState<any[]>([]);
+  const [topUrusan, setTopUrusan]                 = useState<any[]>([]);
+  const [stats, setStats]                         = useState<any[]>([]);
+  const [statsRaw, setStatsRaw]                   = useState<any>({});
+  const [aiInsights, setAiInsights]               = useState<any[]>([]);
+  const [aiLoading, setAiLoading]                 = useState(true);
+  const [aiError, setAiError]                     = useState(false);
+  const [loading, setLoading]                     = useState(true);
 
   const [scrollPosition, setScrollPosition] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [showReport, setShowReport] = useState(false);
+  const [showReport, setShowReport]         = useState(false);
 
   // ================== FETCH DASHBOARD ==================
   const fetchDashboard = async () => {
     try {
       setLoading(true);
 
-      const [maturityRes, opdRes, urusanRes, statsRes] = await Promise.all([
-        fetch(`${API_URL}/dashboard/maturity`),
+      const [opdRes, urusanRes, statsRes] = await Promise.all([
         fetch(`${API_URL}/dashboard/top-opd`),
         fetch(`${API_URL}/dashboard/top-urusan`),
         fetch(`${API_URL}/dashboard/stats`),
       ]);
 
-      const maturityRaw = await maturityRes.json();
-      const opdRaw      = await opdRes.json();
-      const urusanRaw   = await urusanRes.json();
-      const stat        = await statsRes.json();
+      const opdRaw    = await opdRes.json();
+      const urusanRaw = await urusanRes.json();
+      const stat      = await statsRes.json();
 
-      setMaturityData(maturityRaw.map((d: any) => ({ level: d.level, jumlah: Number(d.jumlah) })));
       setTopOPD(opdRaw.map((d: any) => ({ name: d.name, jumlah: Number(d.jumlah) })));
       setTopUrusan(urusanRaw.map((d: any) => ({ name: d.name, jumlah: Number(d.jumlah) })));
 
+      setStatsRaw(stat);
       setStats([
-        { icon: TrendingUp, title: 'Total Inovasi',          value: stat.total_inovasi    },
-        { icon: Award,      title: 'Rata-rata Kematangan',   value: stat.rata_kematangan  },
-        { icon: Sparkles,   title: 'Inovasi Digital',        value: stat.inovasi_digital  },
+        { icon: TrendingUp, title: 'Total Inovasi',          value: stat.total_inovasi     },
+        { icon: Award,      title: 'Rata-rata Kematangan',   value: stat.rata_kematangan   },
+        { icon: Sparkles,   title: 'Inovasi Digital',        value: stat.inovasi_digital   },
         { icon: Calendar,   title: 'Inovasi Baru Tahun Ini', value: stat.inovasi_tahun_ini },
       ]);
 
@@ -87,7 +88,7 @@ export function Home({ darkMode }: HomeProps) {
     }
   };
 
-  // ================== FETCH TREND + TAHUN DINAMIS ==================
+  // ================== FETCH TREND JENIS (grafik kiri) ==================
   const fetchTrend = async (year: 'all' | number) => {
     try {
       if (year === 'all') {
@@ -103,7 +104,7 @@ export function Home({ darkMode }: HomeProps) {
 
         setTrendData(normalized);
 
-        // ← ambil daftar tahun dari data yang ada, urutkan ascending
+        // Ambil daftar tahun dinamis dari data
         const years = [...new Set(normalized.map((d: any) => d.tahun as number))]
           .sort((a, b) => a - b);
         setAvailableYears(years);
@@ -116,9 +117,9 @@ export function Home({ darkMode }: HomeProps) {
           const found = raw.find((d: any) => Number(d.bulan) === m.num);
           return {
             bulan:      m.label,
-            digital:    found ? Number(found.digital)           : 0,
-            nondigital: found ? Number(found.nondigital ?? 0)   : 0,
-            teknologi:  found ? Number(found.teknologi)         : 0,
+            digital:    found ? Number(found.digital)         : 0,
+            nondigital: found ? Number(found.nondigital ?? 0) : 0,
+            teknologi:  found ? Number(found.teknologi)       : 0,
           };
         });
 
@@ -127,6 +128,44 @@ export function Home({ darkMode }: HomeProps) {
     } catch (err) {
       console.error('Gagal load trend:', err);
       setTrendData([]);
+    }
+  };
+
+  // ================== FETCH TREND TAHAPAN (grafik kanan) ==================
+  const fetchMaturityTrend = async (year: 'all' | number = 'all') => {
+    try {
+      if (year === 'all') {
+        const res = await fetch(`${API_URL}/dashboard/maturity-trend`);
+        const raw = await res.json();
+
+        const normalized = raw.map((d: any) => ({
+          tahun:     Number(d.tahun),
+          penerapan: Number(d.penerapan),
+          inisiatif: Number(d.inisiatif),
+          ujicoba:   Number(d.ujicoba),
+        }));
+
+        setMaturityTrendData(normalized);
+
+      } else {
+        const res = await fetch(`${API_URL}/dashboard/maturity-trend?tahun=${year}`);
+        const raw = await res.json();
+
+        const normalized = MONTHS.map(m => {
+          const found = raw.find((d: any) => Number(d.bulan) === m.num);
+          return {
+            bulan:     m.label,
+            penerapan: found ? Number(found.penerapan) : 0,
+            inisiatif: found ? Number(found.inisiatif) : 0,
+            ujicoba:   found ? Number(found.ujicoba)   : 0,
+          };
+        });
+
+        setMaturityTrendData(normalized);
+      }
+    } catch (err) {
+      console.error('Gagal load maturity trend:', err);
+      setMaturityTrendData([]);
     }
   };
 
@@ -151,10 +190,11 @@ export function Home({ darkMode }: HomeProps) {
     }
   };
 
-  // ================== MOUNT — fetch semua data ==================
+  // ================== MOUNT ==================
   useEffect(() => {
     fetchDashboard();
     fetchTrend('all');
+    fetchMaturityTrend('all');
     fetchAIInsight(false);
   }, []);
 
@@ -162,27 +202,45 @@ export function Home({ darkMode }: HomeProps) {
   useEffect(() => {
     const interval = setInterval(() => {
       fetchDashboard();
-      fetchTrend(selectedYear); // refresh trend sesuai filter aktif
+      fetchTrend(selectedYear);
+      fetchMaturityTrend(selectedYearMaturity);
     }, AUTO_REFRESH_MS);
     return () => clearInterval(interval);
-  }, [selectedYear]); // restart interval kalau filter tahun berubah
+  }, [selectedYear, selectedYearMaturity]);
 
   // ================== FILTER TAHUN BERUBAH ==================
   useEffect(() => {
     fetchTrend(selectedYear);
   }, [selectedYear]);
 
+  // ================== FILTER TAHUN MATURITY BERUBAH ==================
+  useEffect(() => {
+    fetchMaturityTrend(selectedYearMaturity);
+  }, [selectedYearMaturity]);
+
   // ================== SCROLL ==================
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
       const scrollAmount = 300;
-      const newPosition = direction === 'left'
+      const newPosition  = direction === 'left'
         ? scrollPosition - scrollAmount
         : scrollPosition + scrollAmount;
       scrollContainerRef.current.scrollTo({ left: newPosition, behavior: 'smooth' });
       setScrollPosition(newPosition);
     }
   };
+
+  // ================== SHARED CHART STYLES ==================
+  const gridStroke   = darkMode ? '#374151' : '#e5e7eb';
+  const axisStroke   = darkMode ? '#9ca3af' : '#6b7280';
+  const tooltipStyle = {
+    backgroundColor: darkMode ? '#1f2937' : '#ffffff',
+    border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+    color: darkMode ? '#ffffff' : '#000000',
+    borderRadius: '8px',
+    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+  };
+  const axisStyle = { fontSize: '12px' };
 
   // ================== LOADING ==================
   if (loading) return <SkeletonLoader />;
@@ -218,48 +276,44 @@ export function Home({ darkMode }: HomeProps) {
         </h2>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
 
-          {/* Trend Chart */}
+          {/* Grafik Kiri — Tren Jenis Inovasi per Tahun */}
           <div className={`rounded-lg shadow-md p-4 md:p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-3">
+            <div className="flex items-center justify-between mb-4">
               <h3 className={`text-base md:text-lg font-bold ${darkMode ? 'text-white' : 'text-[#0F172A]'}`}>
                 {selectedYear === 'all'
-                  ? 'Tren Penerapan Inovasi Per Tahun'
-                  : `Tren Penerapan Inovasi Per Bulan (${selectedYear})`}
+                  ? 'Tren Jenis Inovasi Per Tahun'
+                  : `Tren Jenis Inovasi Per Bulan (${selectedYear})`}
               </h3>
-              <div className="flex items-center gap-2">
-                <Filter size={16} className={darkMode ? 'text-gray-400' : 'text-gray-600'} />
-                <select
-                  value={selectedYear}
-                  onChange={e => setSelectedYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white hover:bg-gray-600' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}`}
-                >
-                  <option value="all">Semua Tahun</option>
-                  {/* ← tahun dinamis dari data, otomatis tambah 2026, 2027, dst */}
-                  {availableYears.map(year => (
-                    <option key={year} value={year}>Tahun {year}</option>
-                  ))}
-                </select>
-              </div>
+              <select
+                value={selectedYear}
+                onChange={e => setSelectedYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white hover:bg-gray-600' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+              >
+                <option value="all">Semua Tahun</option>
+                {availableYears.map(year => (
+                  <option key={year} value={year}>Tahun {year}</option>
+                ))}
+              </select>
             </div>
             <div className="w-full h-[300px] md:h-[350px]">
               {trendData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={trendData} margin={{ top: 20, right: 30, left: 20, bottom: 30 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
                     <XAxis
                       dataKey={selectedYear === 'all' ? 'tahun' : 'bulan'}
-                      stroke={darkMode ? '#9ca3af' : '#6b7280'}
-                      style={{ fontSize: '12px' }}
+                      stroke={axisStroke}
+                      style={axisStyle}
                       interval={0}
-                      label={{ value: selectedYear === 'all' ? 'Tahun' : 'Bulan', position: 'insideBottom', offset: -10, fill: darkMode ? '#9ca3af' : '#6b7280' }}
+                      label={{ value: selectedYear === 'all' ? 'Tahun' : 'Bulan', position: 'insideBottom', offset: -10, fill: axisStroke }}
                     />
                     <YAxis
-                      stroke={darkMode ? '#9ca3af' : '#6b7280'}
-                      style={{ fontSize: '12px' }}
-                      label={{ value: 'Jumlah Inovasi', angle: -90, position: 'insideLeft', fill: darkMode ? '#9ca3af' : '#6b7280', style: { textAnchor: 'middle' }, offset: 10 }}
+                      stroke={axisStroke}
+                      style={axisStyle}
+                      label={{ value: 'Jumlah Inovasi', angle: -90, position: 'insideLeft', fill: axisStroke, style: { textAnchor: 'middle' }, offset: 10 }}
                     />
                     <Tooltip
-                      contentStyle={{ backgroundColor: darkMode ? '#1f2937' : '#ffffff', border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`, color: darkMode ? '#ffffff' : '#000000', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                      contentStyle={tooltipStyle}
                       labelFormatter={value => selectedYear === 'all' ? `Tahun ${value}` : `${value} ${selectedYear}`}
                     />
                     <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '12px', paddingBottom: '10px' }} />
@@ -279,23 +333,63 @@ export function Home({ darkMode }: HomeProps) {
             </div>
           </div>
 
-          {/* Maturity Distribution */}
+          {/* Grafik Kanan — Tren Tahapan Inovasi per Tahun */}
           <div className={`rounded-lg shadow-md p-4 md:p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-            <h3 className={`text-base md:text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-[#0F172A]'}`}>
-              Jumlah Inovasi Berdasarkan Tahapan
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-base md:text-lg font-bold ${darkMode ? 'text-white' : 'text-[#0F172A]'}`}>
+                {selectedYearMaturity === 'all'
+                  ? 'Tren Tahapan Inovasi Per Tahun'
+                  : `Tren Tahapan Inovasi Per Bulan (${selectedYearMaturity})`}
+              </h3>
+              <select
+                value={selectedYearMaturity}
+                onChange={e => setSelectedYearMaturity(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${darkMode ? 'bg-gray-700 border-gray-600 text-white hover:bg-gray-600' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+              >
+                <option value="all">Semua Tahun</option>
+                {availableYears.map(year => (
+                  <option key={year} value={year}>Tahun {year}</option>
+                ))}
+              </select>
+            </div>
             <div className="w-full h-[300px] md:h-[350px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={maturityData} barSize={60} margin={{ top: 20, right: 30, left: 60, bottom: 50 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                  <XAxis dataKey="level" stroke={darkMode ? '#9ca3af' : '#6b7280'} style={{ fontSize: '12px' }} interval={0} label={{ value: 'Tahapan Inovasi', position: 'insideBottom', offset: -15, fill: darkMode ? '#9ca3af' : '#6b7280' }} />
-                  <YAxis stroke={darkMode ? '#9ca3af' : '#6b7280'} style={{ fontSize: '12px' }} label={{ value: 'Jumlah Inovasi', angle: -90, position: 'center', fill: darkMode ? '#9ca3af' : '#6b7280', style: { textAnchor: 'middle' }, dx: -25 }} />
-                  <Tooltip contentStyle={{ backgroundColor: darkMode ? '#1f2937' : '#ffffff', border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`, color: darkMode ? '#ffffff' : '#000000' }} />
-                  <Bar dataKey="jumlah" fill="#2563EB" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {maturityTrendData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={maturityTrendData} margin={{ top: 20, right: 30, left: 20, bottom: 30 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+                    <XAxis
+                      dataKey={selectedYearMaturity === 'all' ? 'tahun' : 'bulan'}
+                      stroke={axisStroke}
+                      style={axisStyle}
+                      interval={0}
+                      label={{ value: selectedYearMaturity === 'all' ? 'Tahun' : 'Bulan', position: 'insideBottom', offset: -10, fill: axisStroke }}
+                    />
+                    <YAxis
+                      stroke={axisStroke}
+                      style={axisStyle}
+                      label={{ value: 'Jumlah Inovasi', angle: -90, position: 'insideLeft', fill: axisStroke, style: { textAnchor: 'middle' }, offset: 10 }}
+                    />
+                    <Tooltip
+                      contentStyle={tooltipStyle}
+                      labelFormatter={value => selectedYearMaturity === 'all' ? `Tahun ${value}` : `${value} ${selectedYearMaturity}`}
+                    />
+                    <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '12px', paddingBottom: '10px' }} />
+                    <Line type="monotone" dataKey="penerapan" stroke="#2563EB" strokeWidth={3} name="Penerapan" dot={{ fill: '#2563EB', r: 4 }} activeDot={{ r: 6 }} />
+                    <Line type="monotone" dataKey="inisiatif" stroke="#10b981" strokeWidth={3} name="Inisiatif" dot={{ fill: '#10b981', r: 4 }} activeDot={{ r: 6 }} />
+                    <Line type="monotone" dataKey="ujicoba"   stroke="#f59e0b" strokeWidth={3} name="Uji Coba"  dot={{ fill: '#f59e0b', r: 4 }} activeDot={{ r: 6 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className={`flex items-center justify-center h-full ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <div className="text-center">
+                    <p className="text-lg font-medium mb-2">Tidak ada data</p>
+                    <p className="text-sm">{selectedYearMaturity === 'all' ? 'Data tidak tersedia' : `Tidak ada data untuk tahun ${selectedYearMaturity}`}</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+
         </div>
       </div>
 
@@ -306,28 +400,32 @@ export function Home({ darkMode }: HomeProps) {
         </h2>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className={`rounded-lg shadow-md p-4 md:p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-            <h3 className={`text-base md:text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-[#0F172A]'}`}>Top 5 OPD Berdasarkan Jumlah Inovasi</h3>
+            <h3 className={`text-base md:text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-[#0F172A]'}`}>
+              Top 5 Instansi Berdasarkan Jumlah Inovasi
+            </h3>
             <div className="w-full h-[300px] md:h-[350px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={topOPD} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 30 }} barCategoryGap="20%">
-                  <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                  <XAxis type="number" stroke={darkMode ? '#9ca3af' : '#6b7280'} style={{ fontSize: '12px' }} label={{ value: 'Jumlah Inovasi', position: 'insideBottom', offset: -10, fill: darkMode ? '#9ca3af' : '#6b7280', dy: 10 }} />
-                  <YAxis dataKey="name" type="category" stroke={darkMode ? '#9ca3af' : '#6b7280'} width={240} style={{ fontSize: '11px' }} label={{ value: 'OPD', angle: -90, position: 'insideLeft', fill: darkMode ? '#9ca3af' : '#6b7280', style: { textAnchor: 'middle' }, dx: -30 }} />
-                  <Tooltip contentStyle={{ backgroundColor: darkMode ? '#1f2937' : '#ffffff', border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`, color: darkMode ? '#ffffff' : '#000000' }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+                  <XAxis type="number" stroke={axisStroke} style={axisStyle} label={{ value: 'Jumlah Inovasi', position: 'insideBottom', offset: -10, fill: axisStroke, dy: 10 }} />
+                  <YAxis dataKey="name" type="category" stroke={axisStroke} width={240} style={{ fontSize: '11px' }} label={{ value: 'OPD', angle: -90, position: 'insideLeft', fill: axisStroke, style: { textAnchor: 'middle' }, dx: -30 }} />
+                  <Tooltip contentStyle={tooltipStyle} />
                   <Bar dataKey="jumlah" radius={[0, 8, 8, 0]} fill="#2563EB" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
           <div className={`rounded-lg shadow-md p-4 md:p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-            <h3 className={`text-base md:text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-[#0F172A]'}`}>Top 5 Urusan Berdasarkan Jumlah Inovasi</h3>
+            <h3 className={`text-base md:text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-[#0F172A]'}`}>
+              Top 5 Urusan Berdasarkan Jumlah Inovasi
+            </h3>
             <div className="w-full h-[300px] md:h-[350px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={topUrusan} layout="vertical" margin={{ top: 5, right: 30, left: 5, bottom: 30 }} barCategoryGap="20%">
-                  <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#374151' : '#e5e7eb'} />
-                  <XAxis type="number" stroke={darkMode ? '#9ca3af' : '#6b7280'} style={{ fontSize: '12px' }} label={{ value: 'Jumlah Inovasi', position: 'insideBottom', offset: -10, fill: darkMode ? '#9ca3af' : '#6b7280', dy: 10 }} />
-                  <YAxis dataKey="name" type="category" stroke={darkMode ? '#9ca3af' : '#6b7280'} width={200} style={{ fontSize: '11px' }} label={{ value: 'Urusan', angle: -90, position: 'insideLeft', fill: darkMode ? '#9ca3af' : '#6b7280', style: { textAnchor: 'middle' }, dx: -5 }} />
-                  <Tooltip contentStyle={{ backgroundColor: darkMode ? '#1f2937' : '#ffffff', border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`, color: darkMode ? '#ffffff' : '#000000' }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+                  <XAxis type="number" stroke={axisStroke} style={axisStyle} label={{ value: 'Jumlah Inovasi', position: 'insideBottom', offset: -10, fill: axisStroke, dy: 10 }} />
+                  <YAxis dataKey="name" type="category" stroke={axisStroke} width={200} style={{ fontSize: '11px' }} label={{ value: 'Urusan', angle: -90, position: 'insideLeft', fill: axisStroke, style: { textAnchor: 'middle' }, dx: -5 }} />
+                  <Tooltip contentStyle={tooltipStyle} />
                   <Bar dataKey="jumlah" radius={[0, 8, 8, 0]} fill="#2563EB" />
                 </BarChart>
               </ResponsiveContainer>
@@ -403,7 +501,19 @@ export function Home({ darkMode }: HomeProps) {
         </div>
       </div>
 
-      {showReport && <ReportDashboard onClose={() => setShowReport(false)} />}
+      {showReport && (
+        <ReportDashboard
+          onClose={() => setShowReport(false)}
+          trendData={trendData}
+          maturityTrendData={maturityTrendData}
+          topOPD={topOPD}
+          topUrusan={topUrusan}
+          stats={statsRaw}
+          aiInsights={aiInsights}
+          selectedYear={selectedYear}
+          selectedYearMaturity={selectedYearMaturity}
+        />
+      )}
     </div>
   );
 }

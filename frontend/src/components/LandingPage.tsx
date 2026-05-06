@@ -34,8 +34,8 @@ const MOCKUP_SLIDES = [
 ];
 
 const HERO_IMAGES = [
-  '/images/hero1.jpg',
-  '/images/hero2.jpeg',
+  '/images/hero1.png',
+  '/images/hero2.png',
   '/images/hero3.png',
 ];
 

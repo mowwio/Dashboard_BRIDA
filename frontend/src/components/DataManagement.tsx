@@ -33,6 +33,8 @@ export function DataManagement({ darkMode, isLoggedIn, onLoginSuccess }: DataMan
   const [searchTerm, setSearchTerm] = useState('');
   const [filterJenis, setFilterJenis] = useState('Semua');
   const [filterTahapan, setFilterTahapan] = useState('Semua');
+  const [filterTahun, setFilterTahun] = useState('Semua'); // ✅ NEW: State Filter Tahun
+  
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingItem, setEditingItem] = useState<InovasiDaerah | null>(null);
@@ -51,7 +53,7 @@ export function DataManagement({ darkMode, isLoggedIn, onLoginSuccess }: DataMan
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<InovasiDaerah | null>(null);
-  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false); // ✅ NEW: Bulk delete modal
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [showSelectionMode, setShowSelectionMode] = useState(false);
   const [successPopup, setSuccessPopup] = useState<{ show: boolean; message: string }>({ show: false, message: '' });
 
@@ -122,12 +124,30 @@ export function DataManagement({ darkMode, isLoggedIn, onLoginSuccess }: DataMan
     return 0;
   });
 
+  // ✅ NEW: Ekstrak daftar tahun yang tersedia
+  const availableYears = ['Semua'];
+  const years = new Set<string>();
+  data.forEach(item => {
+    const tgl = (item as any).tanggal_penerapan;
+    if (tgl) {
+      const year = String(tgl).substring(0, 4);
+      if (year && !isNaN(Number(year))) years.add(year);
+    }
+  });
+  availableYears.push(...Array.from(years).sort().reverse());
+
   const filteredData = sortedData.filter((item) => {
     const matchesSearch = item.judul_inovasi.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.admin_opd.toLowerCase().includes(searchTerm.toLowerCase());
+                          item.admin_opd.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesJenis = filterJenis === 'Semua' || item.jenis === filterJenis;
     const matchesTahapan = filterTahapan === 'Semua' || item.tahapan_inovasi === filterTahapan;
-    return matchesSearch && matchesJenis && matchesTahapan;
+    
+    // ✅ NEW: Filter berdasarkan tahun penerapan
+    const tgl = (item as any).tanggal_penerapan;
+    const year = tgl ? String(tgl).substring(0, 4) : '';
+    const matchesTahun = filterTahun === 'Semua' || year === filterTahun;
+
+    return matchesSearch && matchesJenis && matchesTahapan && matchesTahun;
   });
 
   const paginatedData = filteredData.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
@@ -155,18 +175,14 @@ export function DataManagement({ darkMode, isLoggedIn, onLoginSuccess }: DataMan
     if (showSelectionMode) setSelectedIds([]);
   };
 
-  // ✅ UPDATED: Use custom modal instead of window.confirm
   const handleBulkDelete = async () => {
     if (!isLoggedIn) {
       setShowLoginModal(true);
       return;
     }
-
-    // ✅ Show custom modal instead of window.confirm
     setShowBulkDeleteModal(true);
   };
 
-  // ✅ NEW: Confirm bulk delete function
   const confirmBulkDelete = async () => {
     try {
       const { error } = await supabase
@@ -178,7 +194,7 @@ export function DataManagement({ darkMode, isLoggedIn, onLoginSuccess }: DataMan
 
       setSelectedIds([]);
       setShowSelectionMode(false);
-      setShowBulkDeleteModal(false); // Close modal
+      setShowBulkDeleteModal(false);
       await fetchData();
       showSuccess(`${selectedIds.length} data berhasil dihapus`);
     } catch (err: any) {
@@ -280,7 +296,6 @@ export function DataManagement({ darkMode, isLoggedIn, onLoginSuccess }: DataMan
       setLoginError('');
       setLoginForm({ username: '', password: '' });
       setShowPassword(false);
-      // Execute pending action after login
       setTimeout(() => {
         if (pendingAction === 'add') setShowAddModal(true);
         else if (pendingAction === 'edit' && pendingItem) { setEditingItem(pendingItem); setShowEditModal(true); }
@@ -413,8 +428,9 @@ export function DataManagement({ darkMode, isLoggedIn, onLoginSuccess }: DataMan
 
       {/* Search and Filters */}
       <div className={`rounded-lg shadow-md p-4 sm:p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-1">
+        {/* ✅ REVISI: Grid diubah jadi 4 kolom agar pas dengan filter tahun */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
             <label className={`block text-sm mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Cari Data
             </label>
@@ -465,7 +481,25 @@ export function DataManagement({ darkMode, isLoggedIn, onLoginSuccess }: DataMan
               <option>Penerapan</option>
             </select>
           </div>
+          {/* ✅ NEW: Filter Tahun */}
+          <div>
+            <label className={`block text-sm mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              Tahun Penerapan
+            </label>
+            <select
+              value={filterTahun}
+              onChange={(e) => setFilterTahun(e.target.value)}
+              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800'
+              }`}
+            >
+              {availableYears.map(year => (
+                <option key={year} value={year}>{year === 'Semua' ? 'Semua Tahun' : year}</option>
+              ))}
+            </select>
+          </div>
         </div>
+
         <div className="mt-4 flex justify-between items-center flex-wrap gap-3">
           <button
             onClick={toggleSelectionMode}
@@ -593,7 +627,13 @@ export function DataManagement({ darkMode, isLoggedIn, onLoginSuccess }: DataMan
                 </tr>
               </thead>
               <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
-                {paginatedData.map((item, pageIndex) => (
+                {paginatedData.length === 0 ? (
+                  <tr>
+                    <td colSpan={showSelectionMode ? 8 : 7} className={`px-6 py-8 text-center text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Tidak ada data yang sesuai dengan pencarian atau filter.
+                    </td>
+                  </tr>
+                ) : paginatedData.map((item, pageIndex) => (
                   <tr key={item.no} className={`transition-colors ${
                     darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
                   }`}>
@@ -681,7 +721,7 @@ export function DataManagement({ darkMode, isLoggedIn, onLoginSuccess }: DataMan
             </button>
             <button
               onClick={() => setCurrentPage(currentPage + 1)}
-              disabled={currentPage >= totalPages}
+              disabled={currentPage >= totalPages || totalPages === 0}
               className={`px-3 sm:px-4 py-2 rounded-lg transition-colors text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed ${
                 darkMode ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
               }`}
@@ -736,7 +776,7 @@ export function DataManagement({ darkMode, isLoggedIn, onLoginSuccess }: DataMan
         </div>
       )}
 
-      {/* ✅ Bulk Delete Confirmation Modal */}
+      {/* Bulk Delete Confirmation Modal */}
       {showBulkDeleteModal && (
         <div 
           className="fixed inset-0 flex items-center justify-center z-50 p-4"
